@@ -135,20 +135,21 @@ Ou use FileZilla/WinSCP: envie o arquivo para `~/Desktop/jp-st3am/jp-st3am/serve
 mkdir -p ~/Desktop/jp-st3am/jp-st3am/server/downloads
 ```
 
-### 3.4 Links de download
+### 3.4 Link de download
 
-Depois de enviar o EXE, os links ficam disponíveis em:
+**Recomendado – tudo em um ZIP:**
+http://191.252.100.71:5050/download/launcher-completo
 
-| Arquivo | Link |
-|---------|------|
-| Launcher | http://191.252.100.71:5050/download/launcher |
-| Permitir Firewall | http://191.252.100.71:5050/download/permitir-firewall |
+Baixa um ZIP com **JP-Steam-Launcher.exe** + **PermitirFirewall.bat** juntos.
 
 **Instruções para o usuário:**
-1. Baixar **JP-Steam-Launcher.exe** e **PermitirFirewall.bat**
-2. Colocar os dois na mesma pasta
-3. Executar **PermitirFirewall.bat** primeiro (clique direito → Executar como administrador, ou duplo clique e aprovar o UAC)
-4. Depois abrir o **JP-Steam-Launcher.exe**
+1. Baixar o ZIP e extrair
+2. Executar **PermitirFirewall.bat** primeiro (duplo clique e aprovar o UAC)
+3. Depois abrir o **JP-Steam-Launcher.exe**
+
+**Links individuais (se precisar):**
+- Launcher: http://191.252.100.71:5050/download/launcher
+- Permitir Firewall: http://191.252.100.71:5050/download/permitir-firewall
 
 ---
 

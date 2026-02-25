@@ -9,6 +9,8 @@ import re
 import json
 import uuid
 import sqlite3
+import zipfile
+import io
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_file
@@ -211,6 +213,24 @@ def download_permitir_firewall():
     if not os.path.exists(bat_path):
         return jsonify({"error": "PermitirFirewall.bat não encontrado em server/downloads/"}), 404
     return send_file(bat_path, as_attachment=True, download_name="PermitirFirewall.bat")
+
+
+@app.route("/download/launcher-completo")
+def download_launcher_completo():
+    """Serve ZIP com launcher + PermitirFirewall.bat."""
+    exe_path = os.path.join(DOWNLOAD_DIR, "JP-Steam-Launcher.exe")
+    bat_path = os.path.join(DOWNLOAD_DIR, "PermitirFirewall.bat")
+    if not os.path.exists(exe_path):
+        return jsonify({"error": "Launcher não disponível. Faça upload do EXE em server/downloads/"}), 404
+    if not os.path.exists(bat_path):
+        return jsonify({"error": "PermitirFirewall.bat não encontrado em server/downloads/"}), 404
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(exe_path, "JP-Steam-Launcher.exe")
+        z.write(bat_path, "PermitirFirewall.bat")
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="JP-Steam-Launcher.zip",
+                    mimetype="application/zip")
 
 
 @app.route("/health")
