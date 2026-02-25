@@ -25,7 +25,7 @@ cd server
 ```bash
 # Se não existir config.json, copie o exemplo:
 cp config.exemplo.json config.json
-nano config.json
+geany config.json
 ```
 
 Altere a senha:
@@ -35,32 +35,44 @@ Altere a senha:
   "admin_secret": "SUA_SENHA_FORTE_AQUI_123"
 }
 ```
-Salve (Ctrl+O, Enter, Ctrl+X).
+Salve (Ctrl+S) e feche.
 
-### 1.4 Instalar dependências
+### 1.4 Criar ambiente virtual e instalar dependências
+
+Em VPS com Debian/Ubuntu (PEP 668), use um venv para evitar o erro `externally-managed-environment`:
+
 ```bash
+# Criar ambiente virtual
+python3 -m venv venv
+
+# Ativar o venv (Linux/macOS)
+source venv/bin/activate
+
+# Instalar dependências
 pip install -r requirements.txt
-# ou, se usar Python 3:
-pip3 install -r requirements.txt
 ```
 
+> **Nota:** Se `python3 -m venv` falhar, instale: `sudo apt install python3-venv python3-full`
+
 ### 1.5 Rodar o servidor
+
+**Importante:** Mantenha o venv ativado (`source venv/bin/activate`) antes de rodar.
 
 **Opção A – Em primeiro plano (para testar):**
 ```bash
 python app.py
-# ou python3 app.py
 ```
 Deve aparecer: `Running on http://0.0.0.0:5050`
 
 **Opção B – Em background (produção):**
 ```bash
-nohup python app.py > server.log 2>&1 &
+nohup venv/bin/python app.py > server.log 2>&1 &
 ```
+(Usa o Python do venv diretamente, sem precisar ativar.)
 
 **Opção C – Com PM2 (se tiver instalado):**
 ```bash
-pm2 start app.py --name jp-license --interpreter python3
+pm2 start app.py --name jp-license --interpreter ./venv/bin/python
 pm2 save
 pm2 startup
 ```
@@ -85,6 +97,7 @@ server/
 ├── app.py           # API principal
 ├── config.json      # Porta e senha admin (EDITAR)
 ├── requirements.txt
+├── downloads/       # Coloque JP-Steam-Launcher.exe aqui para download
 ├── generate_keys.py # Gera keys via API
 ├── seed_keys.py     # Gerar keys direto no banco
 ├── keys.db          # Banco criado automaticamente
@@ -93,10 +106,50 @@ server/
 
 ---
 
-## 3. Gerar keys no servidor
+## 3. Gerar launcher no Windows e subir para a VPS
+
+O EXE **só pode ser gerado no Windows** (PyInstaller não faz cross-compile para Linux).
+
+### 3.1 No seu PC Windows
+
+```powershell
+cd jp-st3am\launcher
+.\build.bat
+```
+
+O EXE será criado em `launcher\dist\JP-Steam-Launcher.exe`.
+
+### 3.2 Enviar para a VPS (SCP)
+
+No PowerShell ou CMD do Windows (na pasta do projeto):
+
+```powershell
+scp launcher\dist\JP-Steam-Launcher.exe juliano@191.252.100.71:~/Desktop/jp-st3am/jp-st3am/server/downloads/
+```
+
+Ou use FileZilla/WinSCP: envie o arquivo para `~/Desktop/jp-st3am/jp-st3am/server/downloads/`.
+
+### 3.3 Criar a pasta downloads na VPS (se não existir)
+
+```bash
+mkdir -p ~/Desktop/jp-st3am/jp-st3am/server/downloads
+```
+
+### 3.4 Link de download
+
+Depois de enviar o EXE, o link fica disponível em:
+
+**http://191.252.100.71:5050/download/launcher**
+
+Ou: **http://vps59663.publiccloud.com.br:5050/download/launcher**
+
+---
+
+## 4. Gerar keys no servidor
 
 ```bash
 cd server
+source venv/bin/activate   # se usar venv
 
 # Criar keys direto no banco (sem servidor rodando)
 python seed_keys.py 20
@@ -109,7 +162,7 @@ python generate_keys.py 20
 
 ---
 
-## 4. Configurar o launcher
+## 5. Configurar o launcher
 
 Crie `config.json` na pasta do EXE ou em `%APPDATA%\JP-Steam-Launcher\`:
 
@@ -128,7 +181,7 @@ Ou use o domínio:
 
 ---
 
-## 5. Testar
+## 6. Testar
 
 ```bash
 # Health check
@@ -139,7 +192,7 @@ curl http://191.252.100.71:5050/health
 
 ---
 
-## 6. Rodar independente do jp.sistemas
+## 7. Rodar independente do jp.sistemas
 
 O servidor está em `jp-st3am/server/` e não depende do jp.sistemas. Pode:
 

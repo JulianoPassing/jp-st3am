@@ -11,10 +11,11 @@ import uuid
 import sqlite3
 from datetime import datetime
 from functools import wraps
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "keys.db")
+DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 
 
@@ -192,6 +193,15 @@ def revoke_key():
     affected = conn.total_changes
     conn.close()
     return jsonify({"ok": True, "revoked": affected > 0})
+
+
+@app.route("/download/launcher")
+def download_launcher():
+    """Serve o EXE do launcher para download."""
+    exe_path = os.path.join(DOWNLOAD_DIR, "JP-Steam-Launcher.exe")
+    if not os.path.exists(exe_path):
+        return jsonify({"error": "Launcher não disponível. Faça upload do EXE em server/downloads/"}), 404
+    return send_file(exe_path, as_attachment=True, download_name="JP-Steam-Launcher.exe")
 
 
 @app.route("/health")
