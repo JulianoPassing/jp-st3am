@@ -1,0 +1,4 @@
+{
+  "port": 5050,
+  "admin_secret": "ALTERE_SUA_SENHA_SEGURA"
+}
