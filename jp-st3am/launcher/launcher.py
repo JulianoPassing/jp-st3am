@@ -21,24 +21,38 @@ import shutil
 import tempfile
 import subprocess
 
-# URL do servidor de licenças (altere para sua VPS antes de buildar)
+# URL padrão do servidor de licenças (VPS)
+DEFAULT_LICENSE_SERVER = "http://191.252.100.71:5050"
+
+
 def _get_license_url():
     url = os.environ.get("JP_LICENSE_URL", "")
     if url:
         return url.rstrip("/")
-    for base in [os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__)),
-                 os.path.join(os.environ.get("APPDATA", ""), "JP-Steam-Launcher")]:
+    appdata_dir = os.path.join(os.environ.get("APPDATA", ""), "JP-Steam-Launcher")
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    for base in [exe_dir, appdata_dir]:
         if base:
             cfg = os.path.join(base, "config.json")
             if os.path.exists(cfg):
                 try:
                     with open(cfg, "r", encoding="utf-8") as f:
                         u = (json.load(f).get("license_server") or "").rstrip("/")
-                        if u:
+                        # Ignora localhost - usa VPS
+                        if u and "localhost" not in u.lower() and "127.0.0.1" not in u:
                             return u
                 except Exception:
                     pass
-    return "http://localhost:5000"
+    # Cria config.json automaticamente na primeira execução
+    try:
+        os.makedirs(appdata_dir, exist_ok=True)
+        cfg = os.path.join(appdata_dir, "config.json")
+        with open(cfg, "w", encoding="utf-8") as f:
+            json.dump({"license_server": DEFAULT_LICENSE_SERVER}, f, indent=2)
+    except Exception:
+        pass
+    return DEFAULT_LICENSE_SERVER
+
 
 LICENSE_SERVER_URL = _get_license_url()
 
@@ -145,7 +159,7 @@ def validate_license(key, hardware_id):
                 return True, resp.get("message", "OK")
             return False, resp.get("message", "Key inválida")
     except urllib.error.URLError as e:
-        return False, f"Erro de conexão: {e.reason}"
+        return False, f"Erro de conexão ({url}): {e.reason}"
     except Exception as e:
         return False, str(e)
 
@@ -180,6 +194,32 @@ def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
+        return False
+
+
+def add_firewall_rule():
+    """Adiciona regra no firewall para permitir conexões de saída. Requer admin."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+    try:
+        exe_path = sys.executable
+        if not exe_path or not os.path.exists(exe_path):
+            return False
+        exe_path = os.path.normpath(exe_path)
+        # Remove regra antiga se existir (evita duplicata)
+        subprocess.run(
+            f'netsh advfirewall firewall delete rule name="JP-Steam-Launcher"',
+            shell=True, capture_output=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        # Adiciona regra de saída
+        cmd = f'netsh advfirewall firewall add rule name="JP-Steam-Launcher" dir=out action=allow program="{exe_path}"'
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        return r.returncode == 0
+    except Exception:
         return False
 
 
@@ -1281,6 +1321,9 @@ def main():
             None, "runas", sys.executable, " ".join(sys.argv), None, 1
         )
         sys.exit(0)
+
+    # Permite o launcher no firewall (evita WinError 10051/10061)
+    add_firewall_rule()
 
     # Pular validação (desenvolvimento): JP_SKIP_LICENSE=1
     if os.environ.get("JP_SKIP_LICENSE") == "1":
