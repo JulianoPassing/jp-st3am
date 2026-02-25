@@ -143,25 +143,62 @@ def save_key(key):
         pass
 
 
-def validate_license(key, hardware_id):
-    """Valida key no servidor. Retorna (success, message)."""
+def validate_license_powershell(key, hardware_id):
+    """Valida key via PowerShell (não é bloqueado por firewall/antivírus)."""
     if not key or not hardware_id:
         return False, "Key inválida"
+    url = f"{LICENSE_SERVER_URL}/api/validate"
+    ps_script = (
+        f"$body = @{{ key='{key.strip()}'; hardware_id='{hardware_id}' }} | ConvertTo-Json; "
+        f"try {{ "
+        f"  $r = Invoke-RestMethod -Uri '{url}' -Method POST -Body $body -ContentType 'application/json' -TimeoutSec 10; "
+        f"  if ($r.valid -eq $true) {{ Write-Output ('OK|' + $r.message) }} "
+        f"  else {{ Write-Output ('FAIL|' + $r.message) }} "
+        f"}} catch {{ Write-Output ('ERR|' + $_.Exception.Message) }}"
+    )
     try:
-        url = f"{LICENSE_SERVER_URL}/api/validate"
-        data = json.dumps({"key": key.strip(), "hardware_id": hardware_id}).encode("utf-8")
-        req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("User-Agent", "JP-Steam-Launcher/1.0")
-        with urllib.request.urlopen(req, timeout=10) as r:
-            resp = json.loads(r.read().decode())
-            if resp.get("valid"):
-                return True, resp.get("message", "OK")
-            return False, resp.get("message", "Key inválida")
-    except urllib.error.URLError as e:
-        return False, f"Erro de conexão ({url}): {e.reason}"
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True, text=True, timeout=20,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        output = r.stdout.strip()
+        if output.startswith("OK|"):
+            return True, output[3:] or "OK"
+        elif output.startswith("FAIL|"):
+            return False, output[5:] or "Key inválida"
+        elif output.startswith("ERR|"):
+            return False, f"Erro de conexão: {output[4:]}"
+        else:
+            return False, output or "Erro desconhecido"
+    except subprocess.TimeoutExpired:
+        return False, "Timeout ao conectar ao servidor"
     except Exception as e:
         return False, str(e)
+
+
+def validate_license(key, hardware_id):
+    """Valida key no servidor. Tenta PowerShell primeiro, fallback para urllib."""
+    ok, msg = validate_license_powershell(key, hardware_id)
+    if ok:
+        return True, msg
+    # Se PowerShell falhou por motivo que não é "key inválida", tenta urllib
+    if "inválida" not in msg.lower() and "em uso" not in msg.lower():
+        try:
+            url = f"{LICENSE_SERVER_URL}/api/validate"
+            data = json.dumps({"key": key.strip(), "hardware_id": hardware_id}).encode("utf-8")
+            req = urllib.request.Request(url, data=data, method="POST")
+            req.add_header("Content-Type", "application/json")
+            proxy_handler = urllib.request.ProxyHandler({})
+            opener = urllib.request.build_opener(proxy_handler)
+            with opener.open(req, timeout=10) as r:
+                resp = json.loads(r.read().decode())
+                if resp.get("valid"):
+                    return True, resp.get("message", "OK")
+                return False, resp.get("message", "Key inválida")
+        except Exception:
+            pass
+    return False, msg
 
 
 def extract_app_id(text):
@@ -1245,66 +1282,19 @@ A pasta do LuaTools fica intacta. Útil para reinstalar o Millennium.
                      fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"], text_color="white").pack(side="left", padx=4)
 
 
-def _show_firewall_permission_dialog():
-    """Solicita permissão do firewall ANTES da ativação. Retorna True para continuar."""
-    if sys.platform != "win32":
-        return True
-    root = ctk.CTk()
-    root.title("JP Steam Launcher - Permissão")
-    root.geometry("420x200")
-    root.resizable(False, False)
-    root.configure(fg_color=CORES["fundo_escuro"])
-    root.eval("tk::PlaceWindow . center")
-
-    ctk.CTkLabel(root, text="Permissão necessária", font=ctk.CTkFont(size=18, weight="bold"),
-                 text_color=CORES["texto"]).pack(pady=(24, 12))
-    ctk.CTkLabel(root, text="Para ativar, o launcher precisa de permissão para acessar a rede.\nClique em Permitir e aprove a solicitação (UAC) do Windows.",
-                 font=ctk.CTkFont(size=12), text_color=CORES["texto_secundario"], justify="center").pack(pady=(0, 24))
-
-    result = [None]
-
-    def _on_permitir():
-        _request_admin_and_add_firewall(True)
-        result[0] = True
-        root.destroy()
-
-    def _on_cancelar():
-        result[0] = False
-        root.destroy()
-
-    btn_frame = ctk.CTkFrame(root, fg_color="transparent")
-    btn_frame.pack(pady=(0, 20))
-    ctk.CTkButton(btn_frame, text="Permitir", command=_on_permitir, width=120, height=36,
-                 fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
-                 text_color="white").pack(side="left", padx=8)
-    ctk.CTkButton(btn_frame, text="Cancelar", command=_on_cancelar, width=100, height=36,
-                 fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left")
-
-    root.mainloop()
-    return result[0] is True
-
-
 def _show_license_dialog():
     """Mostra diálogo de ativação. Retorna True se válido, False para sair."""
-    # Primeiro solicita permissão do firewall
-    if not _show_firewall_permission_dialog():
-        return False
-
     hw_id = get_hardware_id()
     stored = load_stored_key()
 
-    def _try_validate(key):
-        ok, msg = validate_license(key, hw_id)
-        return ok, msg
-
     root = ctk.CTk()
     root.title("JP Steam Launcher - Ativação")
-    root.geometry("440x290")
+    root.geometry("440x260")
     root.resizable(False, False)
     root.configure(fg_color=CORES["fundo_escuro"])
     root.eval("tk::PlaceWindow . center")
 
-    result = [None]  # [True] = ok, [False] = cancelar
+    result = [None]
 
     ctk.CTkLabel(root, text="Ativação necessária", font=ctk.CTkFont(size=18, weight="bold"),
                  text_color=CORES["texto"]).pack(pady=(24, 8))
@@ -1318,7 +1308,7 @@ def _show_license_dialog():
         entry_key.insert(0, stored)
 
     lbl_status = ctk.CTkLabel(root, text="", font=ctk.CTkFont(size=11), text_color=CORES["erro"])
-    lbl_status.pack(pady=(0, 8))
+    lbl_status.pack(pady=(0, 12))
 
     def _on_ativar():
         key = entry_key.get().strip()
@@ -1329,12 +1319,12 @@ def _show_license_dialog():
         root.update()
 
         def _worker():
-            ok, msg = _try_validate(key)
-            root.after(0, lambda: _finish_validate(ok, msg, key))
+            ok, msg = validate_license(key, hw_id)
+            root.after(0, lambda: _finish(ok, msg, key))
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _finish_validate(ok, msg, key):
+    def _finish(ok, msg, key):
         if ok:
             save_key(key)
             result[0] = True
@@ -1347,70 +1337,25 @@ def _show_license_dialog():
         root.destroy()
 
     btn_frame = ctk.CTkFrame(root, fg_color="transparent")
-    btn_frame.pack(pady=(0, 12))
+    btn_frame.pack(pady=(0, 20))
     ctk.CTkButton(btn_frame, text="Ativar", command=_on_ativar, width=120, height=36,
                  fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
                  text_color="white").pack(side="left", padx=8)
     ctk.CTkButton(btn_frame, text="Sair", command=_on_sair, width=100, height=36,
                  fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left")
 
-    ctk.CTkButton(root, text="Permitir no Firewall novamente", height=28,
-                 command=lambda: _request_admin_and_add_firewall(True),
-                 fg_color="transparent", text_color=CORES["texto_secundario"]).pack(pady=(0, 12))
-
     root.mainloop()
     return result[0] is True
 
 
-def _request_admin_and_add_firewall(firewall_only=False):
-    """Solicita admin (UAC). Se firewall_only, adiciona regra e sai."""
-    if sys.platform != "win32":
-        return False
-    exe = sys.executable
-    params = "--add-firewall" if (firewall_only and getattr(sys, "frozen", False)) else ""
-    try:
-        r = ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", exe, params, None, 1
-        )
-        return r > 32
-    except Exception:
-        return False
-
-
 def main():
-    # Trata --add-firewall: adiciona regra e sai (precisa ser admin)
-    if "--add-firewall" in sys.argv:
-        if is_admin():
-            ok = add_firewall_rule()
-            try:
-                import ctypes
-                ctypes.windll.user32.MessageBoxW(
-                    0,
-                    "Regra do firewall configurada.\nTente ativar novamente." if ok else "Não foi possível configurar o firewall.",
-                    "JP Steam Launcher",
-                    0x40,
-                )
-            except Exception:
-                pass
-        else:
-            _request_admin_and_add_firewall()
-        sys.exit(0)
-
     if not is_admin():
-        # Solicita UAC para configurar firewall e rodar
-        try:
-            ctypes.windll.user32.MessageBoxW(
-                0,
-                "O JP Steam Launcher precisa de permissões de administrador para configurar o acesso à rede.\n\nClique OK e aprove a solicitação (UAC) para continuar.",
-                "JP Steam Launcher",
-                0x40,  # MB_ICONINFORMATION
-            )
-        except Exception:
-            pass
-        _request_admin_and_add_firewall()
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", sys.executable, " ".join(sys.argv), None, 1
+        )
         sys.exit(0)
 
-    # Permite o launcher no firewall (evita WinError 10051/10061)
+    # 1. Libera firewall automaticamente (já é admin)
     add_firewall_rule()
 
     # Pular validação (desenvolvimento): JP_SKIP_LICENSE=1
@@ -1419,15 +1364,23 @@ def main():
         app.mainloop()
         return
 
-    hw_id = get_hardware_id()
+    # 2. Se já tem key salva, valida via PowerShell
     stored = load_stored_key()
     if stored:
-        ok, _ = validate_license(stored, hw_id)
+        hw_id = get_hardware_id()
+        ok, msg = validate_license(stored, hw_id)
         if ok:
             app = LauncherApp()
             app.mainloop()
             return
+        # Erro de conexão: confia na key local
+        is_connection_error = any(x in msg.lower() for x in ["conexão", "connection", "10051", "10061", "timeout", "unreachable"])
+        if is_connection_error:
+            app = LauncherApp()
+            app.mainloop()
+            return
 
+    # 3. Sem key: mostra tela de ativação (valida via PowerShell)
     if not _show_license_dialog():
         sys.exit(0)
 

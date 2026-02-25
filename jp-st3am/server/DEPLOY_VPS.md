@@ -140,12 +140,14 @@ mkdir -p ~/Desktop/jp-st3am/jp-st3am/server/downloads
 **Recomendado – tudo em um ZIP:**
 http://191.252.100.71:5050/download/launcher-completo
 
-Baixa um ZIP com **JP-Steam-Launcher.exe** + **PermitirFirewall.bat** juntos.
+Baixa um ZIP com **JP-Steam-Launcher.exe** + **AtivarKey.bat** + **PermitirFirewall.bat**.
 
 **Instruções para o usuário:**
 1. Baixar o ZIP e extrair
-2. Executar **PermitirFirewall.bat** primeiro (duplo clique e aprovar o UAC)
+2. Executar **AtivarKey.bat** e digitar a key fornecida
 3. Depois abrir o **JP-Steam-Launcher.exe**
+
+> Se o launcher der erro de conexão, execute **PermitirFirewall.bat** (como admin) e tente novamente.
 
 **Links individuais (se precisar):**
 - Launcher: http://191.252.100.71:5050/download/launcher

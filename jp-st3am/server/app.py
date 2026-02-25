@@ -217,17 +217,17 @@ def download_permitir_firewall():
 
 @app.route("/download/launcher-completo")
 def download_launcher_completo():
-    """Serve ZIP com launcher + PermitirFirewall.bat."""
+    """Serve ZIP com launcher + scripts auxiliares."""
     exe_path = os.path.join(DOWNLOAD_DIR, "JP-Steam-Launcher.exe")
-    bat_path = os.path.join(DOWNLOAD_DIR, "PermitirFirewall.bat")
     if not os.path.exists(exe_path):
         return jsonify({"error": "Launcher não disponível. Faça upload do EXE em server/downloads/"}), 404
-    if not os.path.exists(bat_path):
-        return jsonify({"error": "PermitirFirewall.bat não encontrado em server/downloads/"}), 404
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(exe_path, "JP-Steam-Launcher.exe")
-        z.write(bat_path, "PermitirFirewall.bat")
+        for bat in ["AtivarKey.bat", "PermitirFirewall.bat"]:
+            p = os.path.join(DOWNLOAD_DIR, bat)
+            if os.path.exists(p):
+                z.write(p, bat)
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name="JP-Steam-Launcher.zip",
                     mimetype="application/zip")

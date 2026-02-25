@@ -9,7 +9,7 @@ echo.
 cd /d "%~dp0"
 
 echo [1/3] Instalando dependencias...
-pip install customtkinter pyinstaller --quiet
+pip install customtkinter pyinstaller requests --quiet
 
 echo [2/3] Baixando logo e gerando icone...
 pip install Pillow --quiet
