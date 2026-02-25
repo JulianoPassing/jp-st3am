@@ -11,6 +11,7 @@ import uuid
 import sqlite3
 import zipfile
 import io
+import hashlib
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_file
@@ -231,6 +232,23 @@ def download_launcher_completo():
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name="JP-Steam-Launcher.zip",
                     mimetype="application/zip")
+
+
+@app.route("/api/launcher/version")
+def launcher_version():
+    """Retorna hash SHA256 do EXE atual para auto-update."""
+    exe_path = os.path.join(DOWNLOAD_DIR, "JP-Steam-Launcher.exe")
+    if not os.path.exists(exe_path):
+        return jsonify({"error": "Launcher não disponível"}), 404
+    sha = hashlib.sha256()
+    with open(exe_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha.update(chunk)
+    return jsonify({
+        "hash": sha.hexdigest(),
+        "size": os.path.getsize(exe_path),
+        "download_url": f"{request.host_url}download/launcher",
+    })
 
 
 @app.route("/health")

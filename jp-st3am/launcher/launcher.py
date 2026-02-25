@@ -282,44 +282,35 @@ def is_steamtools_installed():
     return os.path.exists(os.path.join(steam_path, "xinput1_4.dll"))
 
 
+def _add_defender_exclusion():
+    """Adiciona exclusão do Windows Defender para a pasta da Steam."""
+    steam_path = get_steam_path()
+    if not steam_path:
+        return
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Add-MpPreference -ExclusionPath '{steam_path}' -ErrorAction SilentlyContinue"],
+            capture_output=True, timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except Exception:
+        pass
+
+
 def install_steamtools_and_plugins(log_callback):
     """
-    Instala SteamTools, Millennium e LuaTools via jp-steam-setup.ps1.
+    Instala apenas SteamTools (sem Millennium/LuaTools).
     Retorna (sucesso, mensagem).
     """
     steam_path = get_steam_path()
     if not steam_path:
         return False, "Steam não encontrada no sistema"
 
-    # Localizar jp-steam-setup.ps1 (na pasta do script ou no bundle)
-    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    setup_path = os.path.join(base, "jp-steam-setup.ps1")
-    if not os.path.exists(setup_path):
-        setup_path = os.path.join(os.path.dirname(base), "jp-steam-setup.ps1")
-    if not os.path.exists(setup_path):
-        # Fallback: instalar só SteamTools via steam.run
-        return _install_steamtools_only(log_callback)
+    log_callback("Configurando exclusão no antivírus...", "info")
+    _add_defender_exclusion()
 
-    close_steam()
-    log_callback("Executando instalador completo (SteamTools + Millennium + LuaTools)...", "info")
-    try:
-        # "2" = Português, "\n" = Pressione Enter no final
-        proc = subprocess.Popen(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup_path],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            cwd=os.path.dirname(setup_path),
-        )
-        out, err = proc.communicate(input="2\n\n".encode("utf-8"), timeout=180)
-        if proc.returncode == 0 and is_steamtools_installed():
-            log_callback("Instalação concluída com sucesso!", "ok")
-            return True, steam_path
-        return False, err.decode("utf-8", errors="ignore") or f"Código de saída: {proc.returncode}"
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        return False, "Instalação expirou (timeout)"
-    except Exception as e:
-        return False, str(e)
+    return _install_steamtools_only(log_callback)
 
 
 def _install_steamtools_only(log_callback):
@@ -472,6 +463,45 @@ def download_game_files(app_id, log_callback):
     return False, f"Este jogo (App ID {app_id}) não está disponível nas bases de dados. Nem todos os jogos têm manifest/lua público. Tente: steamtools.site, luamani.vercel.app ou manifestlua.blog para verificar se existe."
 
 
+def fetch_dlcs(app_id):
+    """Busca lista de DLCs de um jogo via Steam Store API. Retorna [(dlc_id, nome), ...]."""
+    try:
+        url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "JP-Steam-Launcher/1.0")
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode())
+        app_data = data.get(str(app_id), {})
+        if not app_data.get("success"):
+            return []
+        info = app_data.get("data", {})
+        dlc_ids = info.get("dlc", [])
+        if not dlc_ids:
+            return []
+        dlcs = []
+        # Busca nomes das DLCs em lotes de 20
+        for i in range(0, len(dlc_ids), 20):
+            batch = dlc_ids[i:i+20]
+            for dlc_id in batch:
+                try:
+                    dlc_url = f"https://store.steampowered.com/api/appdetails?appids={dlc_id}"
+                    dlc_req = urllib.request.Request(dlc_url)
+                    dlc_req.add_header("User-Agent", "JP-Steam-Launcher/1.0")
+                    with urllib.request.urlopen(dlc_req, timeout=10) as dr:
+                        dlc_data = json.loads(dr.read().decode())
+                    dlc_info = dlc_data.get(str(dlc_id), {})
+                    if dlc_info.get("success"):
+                        nome = dlc_info["data"].get("name", f"DLC {dlc_id}")
+                        dlcs.append((str(dlc_id), nome))
+                    else:
+                        dlcs.append((str(dlc_id), f"DLC {dlc_id}"))
+                except Exception:
+                    dlcs.append((str(dlc_id), f"DLC {dlc_id}"))
+        return dlcs
+    except Exception:
+        return []
+
+
 def close_steam():
     try:
         os.system('taskkill /F /IM steam.exe 2>nul')
@@ -563,7 +593,7 @@ class LauncherApp(ctk.CTk):
         dlg.configure(fg_color=CORES["fundo_escuro"])
         ctk.CTkLabel(dlg, text="SteamTools não encontrado.", font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=CORES["texto"]).pack(pady=(20, 8))
-        ctk.CTkLabel(dlg, text="Instalando SteamTools, Millennium e LuaTools automaticamente...",
+        ctk.CTkLabel(dlg, text="Instalando SteamTools automaticamente...",
                      font=ctk.CTkFont(size=12), text_color=CORES["texto_secundario"],
                      wraplength=380).pack(pady=(0, 16))
         log_dlg = ctk.CTkTextbox(dlg, height=60, font=ctk.CTkFont(size=10), fg_color=CORES["fundo_card"])
@@ -584,7 +614,15 @@ class LauncherApp(ctk.CTk):
             if success:
                 steam_exe = os.path.join(result, "steam.exe")
                 if os.path.exists(steam_exe):
-                    subprocess.Popen([steam_exe, "-clearbeta"], creationflags=subprocess.CREATE_NO_WINDOW)
+                    import time
+                    time.sleep(3)
+                    subprocess.Popen([steam_exe, "-dev"], creationflags=subprocess.CREATE_NO_WINDOW)
+                    self._show_info(
+                        "Instalação concluída",
+                        "SteamTools instalado com sucesso!\n\n"
+                        "A Steam está abrindo. Aguarde ela abrir completamente.\n\n"
+                        "Se a Steam não abrir, vá na aba 'Steam não abre'."
+                    )
             else:
                 self._show_error("Falha na instalação", str(result))
 
@@ -598,6 +636,16 @@ class LauncherApp(ctk.CTk):
         dlg.configure(fg_color=CORES["fundo_escuro"])
         ctk.CTkLabel(dlg, text=msg, font=ctk.CTkFont(size=12), text_color=CORES["erro"],
                      wraplength=400).pack(pady=20, padx=20)
+        ctk.CTkButton(dlg, text="OK", command=dlg.destroy, fg_color=CORES["botao_azul"]).pack(pady=10)
+
+    def _show_info(self, titulo, msg):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title(titulo)
+        dlg.geometry("450x200")
+        dlg.transient(self)
+        dlg.configure(fg_color=CORES["fundo_escuro"])
+        ctk.CTkLabel(dlg, text=msg, font=ctk.CTkFont(size=12), text_color=CORES["texto"],
+                     wraplength=400, justify="left").pack(pady=20, padx=20)
         ctk.CTkButton(dlg, text="OK", command=dlg.destroy, fg_color=CORES["botao_azul"]).pack(pady=10)
 
     def _build_ui(self):
@@ -895,9 +943,14 @@ Start-Process -FilePath (Join-Path ((Get-ItemProperty "HKLM:\\SOFTWARE\\WOW6432N
 
 Aguarde a Steam abrir.
 
-Solução 3: Execute no PowerShell (como admin):
+Solução 3: Remover Millennium (se instalado anteriormente):
 
-irm pastebin.com/raw/CR7JyVGs | iex
+No PowerShell como admin:
+$s = (Get-ItemProperty "HKLM:\\SOFTWARE\\WOW6432Node\\Valve\\Steam").InstallPath
+Remove-Item "$s\\millennium.dll" -Force -ErrorAction SilentlyContinue
+Remove-Item "$s\\python311.dll" -Force -ErrorAction SilentlyContinue
+Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue
+Start-Process "$s\\steam.exe"
 
 Solução 4: Arquivos .lua com problema?
 
@@ -908,7 +961,6 @@ Se os arquivos .lua parecem corrompidos ou incorretos:
 
 A Steam ainda não abre?
 
-Problemas conhecidos: SteamTools e Millennium podem ter conflitos com certas versões da Steam ou do Windows.
 • Atualize a Steam
 • Reinstale o SteamTools (use a aba Desinstalar e depois reinicie o launcher)
 • Tente iniciar a Steam com modo desenvolvedor: steam.exe -dev"""
@@ -928,9 +980,18 @@ Problemas conhecidos: SteamTools e Millennium podem ter conflitos com certas ver
         scroll_desinstalar = ctk.CTkScrollableFrame(tab_desinstalar, fg_color="transparent")
         scroll_desinstalar.pack(fill="both", expand=True, padx=12, pady=12)
 
-        txt_desinstalar = """🗑️ COMO DESINSTALAR STEAMTOOLS / MILLENNIUM / LUATOOLS
+        txt_desinstalar = """🗑️ COMO DESINSTALAR O STEAMTOOLS
 
-━━━ Plano A: O jeito mais simples (remove TUDO) ━━━
+━━━ Opção 1: Remover só o SteamTools ━━━
+Remove o SteamTools mas mantém a Steam e seus jogos.
+
+Clique no botão "Desinstalar tudo" abaixo, ou manualmente:
+Na pasta da Steam, exclua:
+   • arquivo xinput1_4.dll
+   • pasta config\\stplug-in (arquivos .lua dos jogos)
+   • pasta config\\depotcache (arquivos .manifest)
+
+━━━ Opção 2: Reinstalar a Steam do zero ━━━
 A biblioteca e os jogos também serão removidos!
 
 1. Desinstale a Steam pelo Windows
@@ -938,25 +999,12 @@ A biblioteca e os jogos também serão removidos!
 3. Reinicie o computador
 4. Instale a Steam novamente: https://store.steampowered.com/about/
 
-━━━ Plano B: Remover Millennium apagando LuaTools ━━━
-⚠️ Se quiser apagar os jogos depois, remova TODOS pelo LuaTools ANTES!
-
-1. Baixe o executável do Millennium:
-   https://docs.steambrew.app/users/getting-started/installation
-2. Execute e escolha Remove > Next > Uninstall
-3. Na pasta da Steam, exclua (se existir):
-   • pasta ext
-   • arquivo xinput1_4.dll
-
-━━━ Plano C: Remover Millennium MANTENDO LuaTools ━━━
-A pasta do LuaTools fica intacta. Útil para reinstalar o Millennium.
-
-1. Baixe o executável do Millennium (link acima)
-2. Execute e escolha Remove > Next
-3. ATENÇÃO: Desmarque a opção "Plugins" antes de Uninstall
-4. Na pasta da Steam, exclua (se existir):
-   • pasta ext
-   • arquivo xinput1_4.dll"""
+━━━ Se tiver Millennium instalado ━━━
+No PowerShell como admin:
+$s = (Get-ItemProperty "HKLM:\\SOFTWARE\\WOW6432Node\\Valve\\Steam").InstallPath
+Remove-Item "$s\\millennium.dll" -Force -ErrorAction SilentlyContinue
+Remove-Item "$s\\python311.dll" -Force -ErrorAction SilentlyContinue
+Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
 
         lbl_desinstalar = ctk.CTkTextbox(
             scroll_desinstalar,
@@ -1169,17 +1217,107 @@ A pasta do LuaTools fica intacta. Útil para reinstalar o Millennium.
             return
 
         self._set_buttons_state(True)
-        self.btn_install.configure(text="Processando...")
+        self.btn_install.configure(text="Buscando DLCs...")
         self.log_text.delete("1.0", "end")
         self._log(f"App ID: {app_id}")
+        self._log("Verificando DLCs disponíveis...", "info")
+
+        def check_dlcs():
+            dlcs = fetch_dlcs(app_id)
+            self.after(0, lambda: self._show_dlc_dialog(app_id, dlcs))
+
+        threading.Thread(target=check_dlcs, daemon=True).start()
+
+    def _show_dlc_dialog(self, app_id, dlcs):
+        if not dlcs:
+            self._log("Nenhuma DLC encontrada. Instalando jogo...", "info")
+            self._do_install([app_id])
+            return
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title(f"DLCs do jogo {app_id}")
+        dlg.geometry("500x450")
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.configure(fg_color=CORES["fundo_escuro"])
+
+        ctk.CTkLabel(dlg, text=f"DLCs encontradas: {len(dlcs)}", font=ctk.CTkFont(size=16, weight="bold"),
+                     text_color=CORES["texto"]).pack(pady=(16, 4))
+        ctk.CTkLabel(dlg, text="Selecione as DLCs para instalar junto com o jogo:",
+                     font=ctk.CTkFont(size=12), text_color=CORES["texto_secundario"]).pack(pady=(0, 12))
+
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color=CORES["fundo_card"], height=260)
+        scroll.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+
+        dlc_vars = {}
+        for dlc_id, nome in dlcs:
+            var = ctk.BooleanVar(value=True)
+            dlc_vars[dlc_id] = var
+            ctk.CTkCheckBox(scroll, text=f"{nome} ({dlc_id})", variable=var,
+                           font=ctk.CTkFont(size=12), text_color=CORES["texto"],
+                           fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
+                           ).pack(anchor="w", pady=2, padx=8)
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=(0, 16))
+
+        def _select_all():
+            for v in dlc_vars.values():
+                v.set(True)
+
+        def _deselect_all():
+            for v in dlc_vars.values():
+                v.set(False)
+
+        def _install():
+            ids = [app_id]
+            for dlc_id, var in dlc_vars.items():
+                if var.get():
+                    ids.append(dlc_id)
+            dlg.grab_release()
+            dlg.destroy()
+            self._do_install(ids)
+
+        def _skip():
+            dlg.grab_release()
+            dlg.destroy()
+            self._do_install([app_id])
+
+        ctk.CTkButton(btn_frame, text="Selecionar todas", command=_select_all, width=130, height=32,
+                     fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left", padx=4)
+        ctk.CTkButton(btn_frame, text="Desmarcar todas", command=_deselect_all, width=130, height=32,
+                     fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left", padx=4)
+
+        btn_frame2 = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame2.pack(pady=(0, 16))
+        ctk.CTkButton(btn_frame2, text="Instalar selecionadas", command=_install, width=180, height=38,
+                     fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
+                     text_color="white", font=ctk.CTkFont(size=13, weight="bold")).pack(side="left", padx=4)
+        ctk.CTkButton(btn_frame2, text="Só o jogo", command=_skip, width=100, height=38,
+                     fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left", padx=4)
+
+    def _do_install(self, app_ids):
+        """Instala uma lista de app IDs (jogo + DLCs)."""
+        self.btn_install.configure(text="Processando...")
 
         def worker():
             try:
                 close_steam()
-                success, result = download_game_files(app_id, self._log)
-                self.after(0, lambda: self._finish_install(success, result, app_id))
+                steam_path = None
+                total = len(app_ids)
+                for i, aid in enumerate(app_ids, 1):
+                    self.after(0, lambda a=aid, n=i, t=total: self._log(f"[{n}/{t}] Instalando {a}...", "info"))
+                    success, result = download_game_files(aid, self._log)
+                    if success:
+                        steam_path = result
+                    else:
+                        self.after(0, lambda a=aid, r=result: self._log(f"Falha no {a}: {r}", "erro"))
+                if steam_path:
+                    self.after(0, lambda: self._finish_install(True, steam_path, app_ids[0]))
+                else:
+                    self.after(0, lambda: self._finish_install(False, "Nenhum arquivo encontrado", app_ids[0]))
             except Exception as e:
-                self.after(0, lambda: self._finish_install(False, str(e), app_id))
+                self.after(0, lambda: self._finish_install(False, str(e), app_ids[0]))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1191,7 +1329,7 @@ A pasta do LuaTools fica intacta. Útil para reinstalar o Millennium.
             steam_exe = os.path.join(steam_path_or_error, "steam.exe")
             self._log("Reiniciando Steam...", "ok")
             subprocess.Popen([steam_exe, "-clearbeta"], creationflags=subprocess.CREATE_NO_WINDOW)
-            self._log("Pronto! O jogo deve aparecer na biblioteca.", "ok")
+            self._log("Pronto! O jogo e DLCs devem aparecer na biblioteca.", "ok")
         else:
             self._log(f"Falha: {steam_path_or_error}", "erro")
             self._log("Tente: steamtools.site ou manifestlua.blog", "info")
@@ -1348,6 +1486,81 @@ def _show_license_dialog():
     return result[0] is True
 
 
+def _get_own_hash():
+    """Retorna SHA256 do EXE atual."""
+    if not getattr(sys, "frozen", False):
+        return None
+    try:
+        exe = sys.executable
+        sha = hashlib.sha256()
+        with open(exe, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha.update(chunk)
+        return sha.hexdigest()
+    except Exception:
+        return None
+
+
+def check_for_update():
+    """Verifica se há atualização disponível. Retorna (needs_update, download_url) ou (False, None)."""
+    try:
+        ps_script = (
+            f"try {{ "
+            f"  $r = Invoke-RestMethod -Uri '{LICENSE_SERVER_URL}/api/launcher/version' -TimeoutSec 5; "
+            f"  Write-Output $r.hash; "
+            f"  Write-Output $r.download_url "
+            f"}} catch {{ Write-Output 'ERR' }}"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True, text=True, timeout=15,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        lines = r.stdout.strip().split("\n")
+        if len(lines) >= 2 and lines[0] != "ERR":
+            server_hash = lines[0].strip()
+            download_url = lines[1].strip()
+            local_hash = _get_own_hash()
+            if local_hash and server_hash and local_hash != server_hash:
+                return True, download_url
+        return False, None
+    except Exception:
+        return False, None
+
+
+def do_self_update(download_url):
+    """Baixa o novo EXE e substitui o atual. Retorna True se atualizou."""
+    if not getattr(sys, "frozen", False):
+        return False
+    try:
+        exe_path = sys.executable
+        new_path = exe_path + ".new"
+        old_path = exe_path + ".old"
+        ps_script = (
+            f"try {{ "
+            f"  Invoke-WebRequest -Uri '{download_url}' -OutFile '{new_path}' -UseBasicParsing -TimeoutSec 60; "
+            f"  Write-Output 'OK' "
+            f"}} catch {{ Write-Output 'ERR' }}"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True, text=True, timeout=90,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if "OK" not in r.stdout:
+            return False
+        if not os.path.exists(new_path) or os.path.getsize(new_path) < 1000:
+            return False
+        # Renomeia: atual → .old, novo → atual
+        if os.path.exists(old_path):
+            os.remove(old_path)
+        os.rename(exe_path, old_path)
+        os.rename(new_path, exe_path)
+        return True
+    except Exception:
+        return False
+
+
 def main():
     if not is_admin():
         ctypes.windll.shell32.ShellExecuteW(
@@ -1357,6 +1570,38 @@ def main():
 
     # 1. Libera firewall automaticamente (já é admin)
     add_firewall_rule()
+
+    # 2. Auto-update: verifica se há versão nova no servidor
+    if getattr(sys, "frozen", False):
+        try:
+            needs_update, download_url = check_for_update()
+            if needs_update and download_url:
+                resp = ctypes.windll.user32.MessageBoxW(
+                    0,
+                    "Uma nova versão do JP Steam Launcher está disponível.\n\nDeseja atualizar agora?",
+                    "JP Steam Launcher - Atualização",
+                    0x24,  # MB_YESNO | MB_ICONQUESTION
+                )
+                if resp == 6:  # IDYES
+                    ctypes.windll.user32.MessageBoxW(
+                        0,
+                        "Baixando atualização... Aguarde.\n\nO launcher será reiniciado automaticamente.",
+                        "JP Steam Launcher",
+                        0x40,
+                    )
+                    if do_self_update(download_url):
+                        # Reinicia o launcher atualizado
+                        subprocess.Popen([sys.executable] + sys.argv[1:])
+                        sys.exit(0)
+                    else:
+                        ctypes.windll.user32.MessageBoxW(
+                            0,
+                            "Falha ao atualizar. Continuando com a versão atual.",
+                            "JP Steam Launcher",
+                            0x30,
+                        )
+        except Exception:
+            pass
 
     # Pular validação (desenvolvimento): JP_SKIP_LICENSE=1
     if os.environ.get("JP_SKIP_LICENSE") == "1":
