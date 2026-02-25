@@ -204,6 +204,15 @@ def download_launcher():
     return send_file(exe_path, as_attachment=True, download_name="JP-Steam-Launcher.exe")
 
 
+@app.route("/download/permitir-firewall")
+def download_permitir_firewall():
+    """Serve o .bat para permitir o launcher no firewall."""
+    bat_path = os.path.join(DOWNLOAD_DIR, "PermitirFirewall.bat")
+    if not os.path.exists(bat_path):
+        return jsonify({"error": "PermitirFirewall.bat não encontrado em server/downloads/"}), 404
+    return send_file(bat_path, as_attachment=True, download_name="PermitirFirewall.bat")
+
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})

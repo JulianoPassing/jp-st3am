@@ -1245,8 +1245,51 @@ A pasta do LuaTools fica intacta. Útil para reinstalar o Millennium.
                      fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"], text_color="white").pack(side="left", padx=4)
 
 
+def _show_firewall_permission_dialog():
+    """Solicita permissão do firewall ANTES da ativação. Retorna True para continuar."""
+    if sys.platform != "win32":
+        return True
+    root = ctk.CTk()
+    root.title("JP Steam Launcher - Permissão")
+    root.geometry("420x200")
+    root.resizable(False, False)
+    root.configure(fg_color=CORES["fundo_escuro"])
+    root.eval("tk::PlaceWindow . center")
+
+    ctk.CTkLabel(root, text="Permissão necessária", font=ctk.CTkFont(size=18, weight="bold"),
+                 text_color=CORES["texto"]).pack(pady=(24, 12))
+    ctk.CTkLabel(root, text="Para ativar, o launcher precisa de permissão para acessar a rede.\nClique em Permitir e aprove a solicitação (UAC) do Windows.",
+                 font=ctk.CTkFont(size=12), text_color=CORES["texto_secundario"], justify="center").pack(pady=(0, 24))
+
+    result = [None]
+
+    def _on_permitir():
+        _request_admin_and_add_firewall(True)
+        result[0] = True
+        root.destroy()
+
+    def _on_cancelar():
+        result[0] = False
+        root.destroy()
+
+    btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+    btn_frame.pack(pady=(0, 20))
+    ctk.CTkButton(btn_frame, text="Permitir", command=_on_permitir, width=120, height=36,
+                 fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
+                 text_color="white").pack(side="left", padx=8)
+    ctk.CTkButton(btn_frame, text="Cancelar", command=_on_cancelar, width=100, height=36,
+                 fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left")
+
+    root.mainloop()
+    return result[0] is True
+
+
 def _show_license_dialog():
     """Mostra diálogo de ativação. Retorna True se válido, False para sair."""
+    # Primeiro solicita permissão do firewall
+    if not _show_firewall_permission_dialog():
+        return False
+
     hw_id = get_hardware_id()
     stored = load_stored_key()
 
@@ -1256,7 +1299,7 @@ def _show_license_dialog():
 
     root = ctk.CTk()
     root.title("JP Steam Launcher - Ativação")
-    root.geometry("440x260")
+    root.geometry("440x290")
     root.resizable(False, False)
     root.configure(fg_color=CORES["fundo_escuro"])
     root.eval("tk::PlaceWindow . center")
@@ -1275,7 +1318,7 @@ def _show_license_dialog():
         entry_key.insert(0, stored)
 
     lbl_status = ctk.CTkLabel(root, text="", font=ctk.CTkFont(size=11), text_color=CORES["erro"])
-    lbl_status.pack(pady=(0, 12))
+    lbl_status.pack(pady=(0, 8))
 
     def _on_ativar():
         key = entry_key.get().strip()
@@ -1304,22 +1347,67 @@ def _show_license_dialog():
         root.destroy()
 
     btn_frame = ctk.CTkFrame(root, fg_color="transparent")
-    btn_frame.pack(pady=(0, 20))
+    btn_frame.pack(pady=(0, 12))
     ctk.CTkButton(btn_frame, text="Ativar", command=_on_ativar, width=120, height=36,
                  fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
                  text_color="white").pack(side="left", padx=8)
     ctk.CTkButton(btn_frame, text="Sair", command=_on_sair, width=100, height=36,
                  fg_color=CORES["fundo_card"], text_color=CORES["texto"]).pack(side="left")
 
+    ctk.CTkButton(root, text="Permitir no Firewall novamente", height=28,
+                 command=lambda: _request_admin_and_add_firewall(True),
+                 fg_color="transparent", text_color=CORES["texto_secundario"]).pack(pady=(0, 12))
+
     root.mainloop()
     return result[0] is True
 
 
-def main():
-    if not is_admin():
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, " ".join(sys.argv), None, 1
+def _request_admin_and_add_firewall(firewall_only=False):
+    """Solicita admin (UAC). Se firewall_only, adiciona regra e sai."""
+    if sys.platform != "win32":
+        return False
+    exe = sys.executable
+    params = "--add-firewall" if (firewall_only and getattr(sys, "frozen", False)) else ""
+    try:
+        r = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", exe, params, None, 1
         )
+        return r > 32
+    except Exception:
+        return False
+
+
+def main():
+    # Trata --add-firewall: adiciona regra e sai (precisa ser admin)
+    if "--add-firewall" in sys.argv:
+        if is_admin():
+            ok = add_firewall_rule()
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0,
+                    "Regra do firewall configurada.\nTente ativar novamente." if ok else "Não foi possível configurar o firewall.",
+                    "JP Steam Launcher",
+                    0x40,
+                )
+            except Exception:
+                pass
+        else:
+            _request_admin_and_add_firewall()
+        sys.exit(0)
+
+    if not is_admin():
+        # Solicita UAC para configurar firewall e rodar
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "O JP Steam Launcher precisa de permissões de administrador para configurar o acesso à rede.\n\nClique OK e aprove a solicitação (UAC) para continuar.",
+                "JP Steam Launcher",
+                0x40,  # MB_ICONINFORMATION
+            )
+        except Exception:
+            pass
+        _request_admin_and_add_firewall()
         sys.exit(0)
 
     # Permite o launcher no firewall (evita WinError 10051/10061)

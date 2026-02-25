@@ -97,7 +97,7 @@ server/
 ├── app.py           # API principal
 ├── config.json      # Porta e senha admin (EDITAR)
 ├── requirements.txt
-├── downloads/       # Coloque JP-Steam-Launcher.exe aqui para download
+├── downloads/       # JP-Steam-Launcher.exe + PermitirFirewall.bat
 ├── generate_keys.py # Gera keys via API
 ├── seed_keys.py     # Gerar keys direto no banco
 ├── keys.db          # Banco criado automaticamente
@@ -135,13 +135,20 @@ Ou use FileZilla/WinSCP: envie o arquivo para `~/Desktop/jp-st3am/jp-st3am/serve
 mkdir -p ~/Desktop/jp-st3am/jp-st3am/server/downloads
 ```
 
-### 3.4 Link de download
+### 3.4 Links de download
 
-Depois de enviar o EXE, o link fica disponível em:
+Depois de enviar o EXE, os links ficam disponíveis em:
 
-**http://191.252.100.71:5050/download/launcher**
+| Arquivo | Link |
+|---------|------|
+| Launcher | http://191.252.100.71:5050/download/launcher |
+| Permitir Firewall | http://191.252.100.71:5050/download/permitir-firewall |
 
-Ou: **http://vps59663.publiccloud.com.br:5050/download/launcher**
+**Instruções para o usuário:**
+1. Baixar **JP-Steam-Launcher.exe** e **PermitirFirewall.bat**
+2. Colocar os dois na mesma pasta
+3. Executar **PermitirFirewall.bat** primeiro (clique direito → Executar como administrador, ou duplo clique e aprovar o UAC)
+4. Depois abrir o **JP-Steam-Launcher.exe**
 
 ---
 
