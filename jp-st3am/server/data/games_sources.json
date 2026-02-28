@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "id": "steamtools",
+      "name": "SteamTools GameList",
+      "url": "https://raw.githubusercontent.com/SteamTools-Team/GameList/main/games.json",
+      "format": "array",
+      "fields": {"name": "name", "appid": "appid"},
+      "filter_drm_first": true,
+      "enabled": true,
+      "cache_hours": 1
+    },
+    {
+      "id": "steamappslist",
+      "name": "SteamAppsListDumps (PaulCombal)",
+      "url": "https://raw.githubusercontent.com/PaulCombal/SteamAppsListDumps/master/game_list.json",
+      "format": "applist",
+      "path": "applist.apps",
+      "fields": {"name": "name", "appid": "appid"},
+      "enabled": true,
+      "cache_hours": 24
+    }
+  ],
+  "notes": "Fontes pesquisadas: SteamTools (drm), SteamAppsListDumps, CrackWatch API (instável), RAWG API (requer key), Steam API GetAppList (404)"
+}

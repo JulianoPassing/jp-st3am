@@ -1,5 +1,11 @@
 {
   "send_launcher_key": false,
+  "ferramentas": {
+    "anadius_origin_emu": "https://anadius.su/origin-emulator",
+    "anadius_origin_helper": "https://anadius.su/origin-helper",
+    "anadius_dlc_unlockers": "https://anadius.su/dlc-unlockers",
+    "goldberg_emu": "https://gitlab.com/Mr_Goldberg/goldberg_emulator"
+  },
   "games": [
     {
       "appid": "3764200",
@@ -11,9 +17,7 @@
         "3. Clique em Instalar e siga as instruções",
         "4. Sem ativação extra necessária"
       ],
-      "links": {
-        "launcher": "/download/launcher-completo"
-      }
+      "links": {"launcher": "/download/launcher-completo"}
     },
     {
       "appid": "1349630",
@@ -21,15 +25,16 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe os arquivos do jogo (link abaixo)",
-        "2. Baixe o Secret Sauce e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Renomeie: GAME.exe → GAME-original.exe | GAME fixed.exe → GAME.exe",
         "4. Execute GAME.exe - será gerado um arquivo de ticket .txt",
-        "5. Envie o arquivo de ticket aqui neste chat e aguarde o token"
+        "5. Envie o arquivo .txt aqui neste chat e aguarde o token",
+        "6. Coloque o token em anadius.cfg e execute o jogo"
       ],
       "links": {
         "jogo": "https://multiup.io/7f19828db19c75b93bdfe631e0f70c46",
-        "secret_sauce": "https://gofile.io/d/Qruo4g",
-        "secret_sauce_2": "https://gofile.io/d/f3mWug",
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -39,12 +44,14 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe os arquivos do jogo (Steam) + arquivos de conversão EA",
-        "2. Baixe o Secret Sauce e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Renomeie o executável conforme instruções do jogo",
         "4. Execute e gere o ticket .txt",
         "5. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -53,23 +60,342 @@
       "name": "Black Myth: Wukong",
       "type": "bypass",
       "steps": [
-        "1. Baixe o jogo e o bypass (verifique o canal de instruções)",
+        "1. Baixe o jogo e o bypass (Denuvo offline activation - verifique canal)",
         "2. Extraia o bypass na pasta do jogo",
         "3. Execute o jogo"
       ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "990080",
+      "name": "Hogwarts Legacy",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack/bypass (EMPRESS - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2054970",
+      "name": "Dragon's Dogma 2",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o bypass (rain0x06 - verifique canal)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1687950",
+      "name": "Persona 5 Royal",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (MKDEV - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1680880",
+      "name": "Atomic Heart",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (MrLemon - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1244460",
+      "name": "Jurassic World Evolution 2",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (machine4578 - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2052050",
+      "name": "Judgment",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (EMPRESS - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2058190",
+      "name": "Lost Judgment",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "916440",
+      "name": "Anno 1800",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (EMPRESS - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "703080",
+      "name": "Planet Zoo",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (EMPRESS - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1113000",
+      "name": "Persona 4 Golden",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (whiteee - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1188930",
+      "name": "Maneater",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (EMPRESS - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2161700",
+      "name": "Persona 3 Reload",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o Demo Bypass (verifique canal)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2319520",
+      "name": "Shin Megami Tensei V: Vengeance",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o Demo Bypass (verifique canal)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2679460",
+      "name": "Metaphor: ReFantazio",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o Demo Bypass (verifique canal)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "1293830",
+      "name": "Sonic Colors: Ultimate",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (voices38 - verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "368260",
+      "name": "Marvel's Midnight Suns",
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o crack (verifique canal)",
+        "2. Extraia o crack na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    {
+      "appid": "2379780",
+      "name": "Stellar Blade",
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe o jogo (verifique canal)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta",
+        "3. Execute o jogo - gere o ticket .txt",
+        "4. Envie o ticket aqui e aguarde o token"
+      ],
       "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
         "launcher": "/download/launcher-completo"
       }
-    }
+    },
+    {
+      "appid": "3159330",
+      "name": "Assassin's Creed Shadows",
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe o jogo (verifique canal)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "3. Execute e gere o ticket .txt",
+        "4. Envie o ticket aqui e aguarde o token"
+      ],
+      "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
+        "launcher": "/download/launcher-completo"
+      }
+    },
+    {
+      "appid": "2840770",
+      "name": "Avatar Frontiers of Pandora",
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe o jogo (verifique canal)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "3. Execute e gere o ticket .txt",
+        "4. Envie o ticket aqui e aguarde o token"
+      ],
+      "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
+        "launcher": "/download/launcher-completo"
+      }
+    },
+    {
+      "appid": "2842040",
+      "name": "Star Wars Outlaws",
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe o jogo (verifique canal)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "3. Execute e gere o ticket .txt",
+        "4. Envie o ticket aqui e aguarde o token"
+      ],
+      "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
+        "launcher": "/download/launcher-completo"
+      }
+    },
+    {"appid": "2195250", "name": "EA Sports FC 24", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App (desative atualizações)", "2. VPN (EAU/México/Colômbia) se Showcase", "3. Execute até o menu, feche", "4. Baixe Showcase Magic/Bypass e extraia", "5. Execute Bypass.bat", "6. Inicie pelo executável fixed"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "2701440", "name": "EA Sports FC 25", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App (desative atualizações)", "2. VPN (EAU/México/Colômbia) se Showcase", "3. Execute até o menu, feche", "4. Baixe Showcase Magic/Bypass e extraia", "5. Execute Bypass.bat", "6. Inicie pelo executável fixed"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "", "name": "EA Sports FC 26", "type": "ea_bypass", "steps": ["1. Baixe FC 26 Showcase pelo EA App (desative atualizações)", "2. VPN: UrbanVPN - UAE, México ou Colômbia", "3. Execute online até o menu, feche", "4. Baixe Showcase Magic (pixeldrain.com/u/Yjy4pTvX) e extraia", "5. Execute Bypass.bat", "6. Inicie por FC26_Showcase fixed.exe"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "", "name": "EA Sports Madden 26", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App (desative atualizações)", "2. VPN se Showcase", "3. Execute até o menu, feche", "4. Baixe bypass e extraia", "5. Execute Bypass.bat", "6. Inicie pelo executável fixed"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "1678720", "name": "EA Sports PGA TOUR", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui ou use bypass"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "1844540", "name": "EA Sports WRC", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe bypass e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "2488620", "name": "F1 24", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "", "name": "F1 25", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe bypass e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"launcher": "/download/launcher-completo"}},
+    {"appid": "1307710", "name": "Grid Legends", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "1249790", "name": "Lost in Random", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "2249480", "name": "Prince of Persia The Lost Crown", "type": "bypass", "steps": ["1. Baixe o jogo e o bypass", "2. Extraia na pasta do jogo", "3. Execute o jogo"], "links": {"launcher": "/download/launcher-completo"}}
   ],
+  "activation_templates": {
+    "denuvo_ticket": {
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe os arquivos do jogo (verifique o canal de instruções)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "3. Renomeie os executáveis conforme instruções do jogo",
+        "4. Execute o jogo - será gerado um arquivo de ticket .txt",
+        "5. Envie o arquivo .txt aqui neste chat e aguarde o token"
+      ],
+      "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
+        "launcher": "/download/launcher-completo"
+      }
+    },
+    "bypass": {
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo e o bypass/crack (verifique o canal de instruções)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    "ea_showcase": {
+      "type": "ea_bypass",
+      "steps": [
+        "1. Baixe o jogo pelo EA App (DESATIVE atualizações automáticas)",
+        "2. Use VPN (EAU, México ou Colômbia) se Showcase - regiões limitadas",
+        "3. Execute o jogo online até o menu principal, depois feche",
+        "4. Baixe o Showcase Magic/Bypass e extraia na pasta do jogo",
+        "5. Execute Bypass.bat e escolha o mod manager",
+        "6. Inicie o jogo pelo executável fixed"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    "ea_anadius": {
+      "type": "denuvo_ticket",
+      "steps": [
+        "1. Baixe o jogo (EA App/Origin)",
+        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta",
+        "3. Execute o jogo - gere o ticket .txt",
+        "4. Envie o ticket aqui e aguarde o token",
+        "5. Coloque o token em anadius.cfg"
+      ],
+      "links": {
+        "anadius_emu": "https://anadius.su/origin-emulator",
+        "origin_helper": "https://anadius.su/origin-helper",
+        "launcher": "/download/launcher-completo"
+      }
+    },
+    "ubisoft": {
+      "type": "bypass",
+      "steps": [
+        "1. Baixe o jogo (verifique o canal de instruções)",
+        "2. Baixe o bypass/emu e extraia na pasta do jogo",
+        "3. Execute conforme instruções do bypass",
+        "4. Inicie o jogo"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    },
+    "steam_launcher": {
+      "type": "steam",
+      "steps": [
+        "1. Baixe o launcher (link abaixo)",
+        "2. No launcher, busque pelo nome ou ID do jogo",
+        "3. Clique em Instalar e siga as instruções"
+      ],
+      "links": {"launcher": "/download/launcher-completo"}
+    }
+  },
   "default": {
     "steps": [
       "1. Baixe o launcher (link abaixo)",
       "2. Abra o JP Steam Launcher e busque pelo ID ou nome do jogo",
       "3. Clique em Instalar"
     ],
-    "links": {
-      "launcher": "/download/launcher-completo"
-    }
+    "links": {"launcher": "/download/launcher-completo"}
   }
 }

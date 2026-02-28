@@ -39,9 +39,18 @@ Sistema **automático** de ativação via tickets. Usuário abre ticket, envia I
 | `/jogos-ativacao` | Lista jogos com ativação configurada |
 | `/status` | Status da API |
 
-## Adicionar jogos
+## Fontes de jogos
 
-Edite `data/games_activation.json`:
+| Fonte | Onde aparece | Quantidade |
+|-------|--------------|------------|
+| **games_activation.json** | Menu clicável no ticket + comando `/ativar` | Os que você configurar (até 25 no menu) |
+| **gamelist (SteamTools)** | Quando o usuário **digita** ID/nome no ticket | 50k+ jogos (usa instruções padrão) |
+
+O **menu clicável** só mostra jogos de `games_activation.json`. Para ter mais jogos no menu, adicione em `data/games_activation.json`.
+
+## Adicionar jogos ao menu
+
+Edite `data/games_activation.json` e adicione no array `games`:
 
 ```json
 {
@@ -57,7 +66,7 @@ Edite `data/games_activation.json`:
 }
 ```
 
-Jogos não listados usam o `default` (key + instalar via launcher).
+Jogos não listados em `games_activation.json` (mas que existem no gamelist) usam o `default` quando o usuário **digita** o ID/nome.
 
 ## Rodar na VPS
 

@@ -112,7 +112,7 @@ server/
 ├── bot/             # Bot Discord (servidor 1477391471752773754)
 │   ├── bot.py       # /pegar-key, /gerar-key, /buscar-jogo, /jogos-ativacao
 │   └── config.py
-├── data/            # games_cache.json, games_activation.json
+├── data/            # games_cache.json, steamappslist_cache.json, games_activation.json
 ├── config.json      # Porta, admin_secret, discord_bot_token (EDITAR)
 ├── run_bot.py       # python run_bot.py
 ├── requirements.txt

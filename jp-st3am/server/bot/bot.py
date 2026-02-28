@@ -30,8 +30,11 @@ from .config import (
 )
 
 GAMELIST_URL = "https://raw.githubusercontent.com/SteamTools-Team/GameList/main/games.json"
+STEAMAPPSLIST_URL = "https://raw.githubusercontent.com/PaulCombal/SteamAppsListDumps/master/game_list.json"
 GAMES_CACHE_PATH = os.path.join(SERVER_DIR, "data", "games_cache.json")
+STEAMAPPSLIST_CACHE_PATH = os.path.join(SERVER_DIR, "data", "steamappslist_cache.json")
 ACTIVATION_CONFIG_PATH = os.path.join(SERVER_DIR, "data", "games_activation.json")
+CATALOG_PATH = os.path.join(SERVER_DIR, "data", "games_catalog.json")
 BANNER_URL = "https://i.imgur.com/HqiZILA.jpeg"
 
 # Threads de ativação (thread_id). Também identificamos por nome "ativacao-"
@@ -66,7 +69,19 @@ def _load_activation_config():
     return {"games": [], "default": {"gera_key": True, "steps": [], "links": {}}}
 
 
+def _load_catalog():
+    """Catálogo do usuário: Steam, EA, Ubisoft - jogos para ativação."""
+    if os.path.exists(CATALOG_PATH):
+        try:
+            with open(CATALOG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"steam": [], "ea": [], "ubisoft": []}
+
+
 def _fetch_gamelist():
+    """SteamTools GameList - tem campo drm para priorizar jogos com proteção."""
     if os.path.exists(GAMES_CACHE_PATH):
         try:
             mtime = os.path.getmtime(GAMES_CACHE_PATH)
@@ -90,6 +105,31 @@ def _fetch_gamelist():
         return []
 
 
+def _fetch_steamappslist():
+    """SteamAppsListDumps (PaulCombal) - apenas jogos, sem DLC."""
+    if os.path.exists(STEAMAPPSLIST_CACHE_PATH):
+        try:
+            mtime = os.path.getmtime(STEAMAPPSLIST_CACHE_PATH)
+            if (datetime.now().timestamp() - mtime) < 86400:
+                with open(STEAMAPPSLIST_CACHE_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+    try:
+        req = urllib.request.Request(STEAMAPPSLIST_URL, headers={"User-Agent": "JP-Steam-Bot/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read().decode())
+        os.makedirs(os.path.dirname(STEAMAPPSLIST_CACHE_PATH), exist_ok=True)
+        with open(STEAMAPPSLIST_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return data
+    except Exception:
+        if os.path.exists(STEAMAPPSLIST_CACHE_PATH):
+            with open(STEAMAPPSLIST_CACHE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+
+
 def _get_activation_games_list():
     """Retorna lista de jogos disponíveis (ordem alfabética) para exibir no embed."""
     cfg = _load_activation_config()
@@ -98,24 +138,101 @@ def _get_activation_games_list():
     return [(g.get("name", "?"), g.get("appid", "")) for g in games]
 
 
+def _get_all_games_from_sources():
+    """Catálogo do usuário (Steam, EA, Ubisoft) - APENAS jogos para ativação."""
+    catalog = _load_catalog()
+    seen = set()
+    result = []
+
+    for platform in ("steam", "ea", "ubisoft"):
+        for g in catalog.get(platform, []):
+            name = g.get("name") or "?"
+            appid = str(g.get("appid", "")).strip()
+            key = appid if appid else name
+            if key and key not in seen:
+                seen.add(key)
+                # value para o Select: appid se tiver, senão name (busca por nome)
+                result.append((name, appid if appid else name))
+
+    if result:
+        return sorted(result, key=lambda x: (x[0] or "?").upper())
+
+    # Fallback: games_activation se catálogo vazio
+    cfg = _load_activation_config()
+    for g in cfg.get("games", []):
+        appid = str(g.get("appid", ""))
+        if appid:
+            result.append((g.get("name", "?"), appid))
+    return sorted(result, key=lambda x: (x[0] or "?").upper())
+
+
+def _get_template_for_platform(platform):
+    """Retorna template de ativação por plataforma (steam/ea/ubisoft)."""
+    cfg = _load_activation_config()
+    templates = cfg.get("activation_templates", {})
+    default = cfg.get("default", {})
+    if platform == "ea":
+        t = templates.get("ea_showcase", {})
+        return {"type": t.get("type", "ea_bypass"), "steps": t.get("steps", default.get("steps", [])), "links": t.get("links", default.get("links", {}))}
+    if platform == "ubisoft":
+        t = templates.get("ubisoft", {})
+        return {"type": t.get("type", "bypass"), "steps": t.get("steps", default.get("steps", [])), "links": t.get("links", default.get("links", {}))}
+    t = templates.get("steam_launcher", {})
+    return {"type": t.get("type", "steam"), "steps": t.get("steps", default.get("steps", [])), "links": t.get("links", default.get("links", {}))}
+
+
 def _find_game_by_id_or_name(query):
-    """Busca jogo em games_activation primeiro, depois no gamelist."""
+    """Busca jogo: games_activation > catálogo+template > gamelist > steamapps."""
     q = (query or "").strip()
     if not q:
         return None, None
 
     cfg = _load_activation_config()
+    default = cfg.get("default", {})
+
+    # 1. games_activation (instruções customizadas)
     for g in cfg.get("games", []):
         if q == str(g.get("appid", "")) or q.lower() in (g.get("name", "") or "").lower():
-            return g, cfg.get("default", {})
+            return g, default
 
+    # 2. Catálogo - usa template por plataforma (instruções de ativação)
+    catalog = _load_catalog()
+    q_lower = q.lower()
+    for platform in ("steam", "ea", "ubisoft"):
+        for item in catalog.get(platform, []):
+            name = item.get("name", "")
+            appid = str(item.get("appid", "")).strip()
+            if q == appid or (name and q_lower in name.lower()):
+                template = _get_template_for_platform(platform)
+                tpl = template if isinstance(template, dict) else {}
+                return {
+                    "appid": appid or "",
+                    "name": name or "?",
+                    "type": tpl.get("type", "steam"),
+                    "gera_key": False,
+                    "steps": tpl.get("steps", default.get("steps", [])),
+                    "links": tpl.get("links", default.get("links", {})),
+                }, default
+
+    # 3. Gamelist / SteamAppsList (fallback - instruções genéricas)
     games = _fetch_gamelist()
     if not isinstance(games, list):
         games = games.get("games", []) if isinstance(games, dict) else []
-    q_lower = q.lower()
     for g in games:
         if q == str(g.get("appid", "")) or q_lower in (g.get("name", "") or "").lower():
-            default = cfg.get("default", {})
+            return {
+                "appid": str(g.get("appid", "")),
+                "name": g.get("name", "?"),
+                "type": "steam",
+                "gera_key": default.get("gera_key", True),
+                "steps": default.get("steps", []),
+                "links": default.get("links", {}),
+            }, default
+
+    steamapps = _fetch_steamappslist()
+    apps = steamapps.get("applist", {}).get("apps", []) if isinstance(steamapps, dict) else []
+    for g in apps:
+        if q == str(g.get("appid", "")) or q_lower in (g.get("name", "") or "").lower():
             return {
                 "appid": str(g.get("appid", "")),
                 "name": g.get("name", "?"),
@@ -143,7 +260,19 @@ def _build_activation_response(game, default, api_base):
     send_key = cfg.get("send_launcher_key", False) or game.get("gera_key", False) or default.get("gera_key", False)
 
     steps = game.get("steps", default.get("steps", []))
-    links = game.get("links", default.get("links", {}))
+    links = dict(game.get("links", default.get("links", {})))
+
+    # Inclui links das ferramentas conforme o tipo de jogo
+    game_type = game.get("type", "")
+    ferramentas = cfg.get("ferramentas", {})
+    if ferramentas:
+        if game_type in ("denuvo_ticket", "ea_bypass"):
+            if "anadius_emu" not in links and "anadius_origin_emu" in ferramentas:
+                links["anadius_emu"] = ferramentas["anadius_origin_emu"]
+            if "origin_helper" not in links and "anadius_origin_helper" in ferramentas:
+                links["origin_helper"] = ferramentas["anadius_origin_helper"]
+        elif game_type == "bypass" and "goldberg_emu" not in links and "goldberg_emu" in ferramentas:
+            links["goldberg_emu"] = ferramentas["goldberg_emu"]
 
     key = _generate_launcher_key() if send_key else None
 
@@ -164,6 +293,10 @@ def _build_activation_response(game, default, api_base):
     label_display = {
         "launcher": "Launcher",
         "jogo": "Arquivos do jogo",
+        "anadius_emu": "Origin Emulator (Anadius)",
+        "origin_helper": "Origin Helper (gerar token)",
+        "anadius_dlc_unlockers": "DLC Unlockers (Sims/EA)",
+        "goldberg_emu": "Goldberg Steam Emulator",
         "secret_sauce": "Secret Sauce",
         "secret_sauce_2": "Secret Sauce (alt)",
     }
@@ -182,55 +315,107 @@ def _build_activation_response(game, default, api_base):
             inline=False,
         )
 
-    embed.set_footer(text="Para jogos Denuvo: envie o arquivo .txt do ticket aqui e aguarde o token.")
+    game_type = game.get("type", "")
+    footer = "Para jogos Denuvo: envie o arquivo .txt do ticket aqui e aguarde o token."
+    if game_type == "denuvo_ticket":
+        footer += " Gerar token: Origin Helper (link acima) - Violentmonkey + EA.com com conta do jogo."
+    embed.set_footer(text=footer)
     return embed
 
 
+GAMES_PER_PAGE = 125  # 5 selects x 25 opções
+MAX_PAGES = 8         # 8 páginas = 1000 jogos no menu
+
+
 class JogosSelectView(View):
-    """Menu Select clicável com jogos disponíveis para ativação."""
+    """Menu Select clicável - uma página (até 125 jogos em 5 selects)."""
 
-    def __init__(self, jogos=None):
+    def __init__(self, jogos=None, page=0):
         super().__init__(timeout=None)
-        games_list = jogos if jogos is not None else _get_activation_games_list()
-        options = []
-        for name, appid in games_list[:25]:  # Discord limita a 25 opções
-            if not appid:
-                continue
-            label = (name or "?")[:100]
-            value = str(appid)[:100]
-            options.append(discord.SelectOption(label=label, value=value, description=f"ID: {appid}"))
-        if not options:
-            options = [discord.SelectOption(label="Nenhum jogo configurado", value="0")]
-        select = Select(
-            custom_id="jogos_select_ativacao",
-            placeholder="Clique para escolher um jogo...",
-            options=options,
-        )
-        select.callback = self._on_select
-        self.add_item(select)
+        games_list = jogos if jogos is not None else _get_all_games_from_sources()
+        if not games_list:
+            games_list = _get_activation_games_list()
 
-    async def _on_select(self, interaction: discord.Interaction, select: Select):
-        value = select.values[0] if select.values else None
-        if not value or value == "0":
-            await interaction.response.send_message(
-                "Nenhum jogo selecionado. Use o menu ou digite o ID/nome.",
-                ephemeral=True,
+        # Pega a fatia desta página
+        start_idx = page * GAMES_PER_PAGE
+        page_games = games_list[start_idx:start_idx + GAMES_PER_PAGE]
+
+        # Discord: máx 5 selects, 25 opções cada
+        chunk_size = 25
+        chunks = [page_games[i:i + chunk_size] for i in range(0, len(page_games), chunk_size)][:5]
+        if not chunks and page < MAX_PAGES:
+            chunks = [[]]  # Placeholder para manter custom_id em páginas vazias (persistência)
+
+        for idx, chunk in enumerate(chunks):
+            options = []
+            for name, val in chunk:
+                value = str(val)[:100] if val else ""
+                if not value or not (name or "?").strip():
+                    continue
+                label = (name or "?")[:100]
+                desc = f"ID: {val}" if val and val.isdigit() else ""
+                options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
+            if not options:
+                options = [discord.SelectOption(label="Nenhum jogo configurado", value="0")]
+            base = page * 5
+            custom_id = "jogos_select_ativacao" if (page == 0 and idx == 0) else f"jogos_select_ativacao_{base + idx}"
+            start = start_idx + idx * 25 + 1
+            end = start_idx + idx * 25 + len(options)
+            placeholder = "Clique para escolher um jogo..." if (page == 0 and idx == 0) else f"Jogos {start}-{end}..."
+            select = Select(
+                custom_id=custom_id,
+                placeholder=placeholder[:150],
+                options=options,
             )
-            return
+            select.callback = self._on_select
+            self.add_item(select)
 
-        await interaction.response.defer()
+    async def _on_select(self, interaction: discord.Interaction, select: Select = None):
+        try:
+            # Valores podem vir em select.values ou interaction.data (depende da versão do discord.py)
+            value = None
+            if select and select.values:
+                value = select.values[0]
+            elif interaction.data and interaction.data.get("values"):
+                value = interaction.data["values"][0]
+            if not value or value == "0":
+                await interaction.response.send_message(
+                    "Nenhum jogo selecionado. Use o menu ou digite o ID/nome.",
+                    ephemeral=True,
+                )
+                return
 
-        game, default = _find_game_by_id_or_name(value)
-        if not game:
-            await interaction.followup.send(
-                f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
-                ephemeral=False,
-            )
-            return
+            await interaction.response.defer()
 
-        api_base = get_api_url().rstrip("/")
-        embed = _build_activation_response(game, default, api_base)
-        await interaction.followup.send(embed=embed)
+            game, default = _find_game_by_id_or_name(value)
+            if not game:
+                await interaction.followup.send(
+                    f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
+                    ephemeral=False,
+                )
+                return
+
+            api_base = get_api_url().rstrip("/")
+            embed = _build_activation_response(game, default, api_base)
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        f"Erro ao processar seleção. Tente digitar o ID do jogo. ({e})",
+                        ephemeral=True,
+                    )
+                else:
+                    data = interaction.data or {}
+                    val = (select.values[0] if select and select.values else None) or (data.get("values") or ["?"])[0]
+                    await interaction.followup.send(
+                        f"Erro ao processar. Tente digitar o ID do jogo: `{val}`",
+                        ephemeral=False,
+                    )
+            except Exception:
+                pass
 
 
 class AbrirTicketView(View):
@@ -311,7 +496,7 @@ class AbrirTicketView(View):
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
-        games_list = _get_activation_games_list()
+        games_list = _get_all_games_from_sources()
 
         embed_inicial = discord.Embed(
             title="Ticket de Ativação — JP Steam Launcher",
@@ -319,16 +504,24 @@ class AbrirTicketView(View):
                 "**Escolha um jogo no menu abaixo** ou envie o ID/nome.\n\n"
                 "O bot responderá automaticamente com:\n"
                 "• Passo a passo de instalação\n"
-                "• Links para download\n"
-                "• Instruções específicas do jogo"
+                "• Links (Anadius, Origin Emulator, etc.)\n"
+                "• Instruções específicas do jogo\n\n"
+                "Digite **ferramentas** para ver todos os links de ativação."
             ),
             color=0x6366f1,
         )
         embed_inicial.set_image(url=BANNER_URL)
         embed_inicial.set_footer(text="Use o menu para escolher um jogo ou digite o ID/nome...")
 
-        view = JogosSelectView(jogos=games_list) if games_list else JogosSelectView()
-        await thread.send(content=f"{user.mention}", embed=embed_inicial, view=view)
+        await thread.send(content=f"{user.mention}", embed=embed_inicial)
+
+        # Envia menus em páginas (125 jogos por mensagem, até 8 páginas = 1000 jogos)
+        num_pages = min(MAX_PAGES, (len(games_list) + GAMES_PER_PAGE - 1) // GAMES_PER_PAGE) if games_list else 0
+        for page in range(num_pages):
+            view = JogosSelectView(jogos=games_list, page=page)
+            if view.children:
+                label = f"Jogos {page * GAMES_PER_PAGE + 1}-{min((page + 1) * GAMES_PER_PAGE, len(games_list))}" if num_pages > 1 else "Jogos disponíveis"
+                await thread.send(content=f"📋 **{label}**", view=view)
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -348,7 +541,8 @@ class JPSteamBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         self.add_view(AbrirTicketView())
-        self.add_view(JogosSelectView())  # Persistência do menu de jogos em tickets antigos
+        for page in range(MAX_PAGES):
+            self.add_view(JogosSelectView(page=page))  # Persistência dos menus em tickets antigos
         print(f"Comandos sincronizados no servidor {DISCORD_GUILD_ID}")
 
     async def on_ready(self):
@@ -400,6 +594,33 @@ async def on_message(message):
             await message.channel.send("Envie um ID (ex: 1349630), nome do jogo, ou o arquivo .txt do ticket.")
             return
 
+        # Resposta rápida: ferramentas/links
+        q_lower = query.lower()
+        if q_lower in ("ferramentas", "links", "anadius", "tools"):
+            cfg = _load_activation_config()
+            ferramentas = cfg.get("ferramentas", {})
+            if not ferramentas:
+                await message.channel.send("Nenhuma ferramenta configurada.")
+                return
+            lines = []
+            labels = {
+                "anadius_origin_emu": "Origin Emulator (Anadius)",
+                "anadius_origin_helper": "Origin Helper (gerar token Denuvo)",
+                "anadius_dlc_unlockers": "DLC Unlockers (Sims/EA)",
+                "goldberg_emu": "Goldberg Steam Emulator",
+            }
+            for k, url in ferramentas.items():
+                lbl = labels.get(k, k.replace("_", " ").title())
+                lines.append(f"**{lbl}:** {url}")
+            embed = discord.Embed(
+                title="Ferramentas de ativação",
+                description="Links diretos — use conforme o jogo.\n\n" + "\n".join(lines),
+                color=0x10b981,
+            )
+            embed.set_footer(text="Origin Helper: instale Violentmonkey, depois o script. Na EA.com com conta do jogo, gere o token.")
+            await message.channel.send(embed=embed)
+            return
+
         await message.channel.typing()
         game, default = _find_game_by_id_or_name(query)
 
@@ -425,10 +646,14 @@ async def on_message(message):
 
 def _build_ativar_embed():
     """Monta embed profissional para /ativar com banner e lista de jogos."""
-    games_list = _get_activation_games_list()
+    games_list = _get_all_games_from_sources()
+    if not games_list:
+        games_list = _get_activation_games_list()
     if games_list:
-        lines = [f"• **{name}** `ID: {appid}`" for name, appid in games_list]
-        games_text = "\n".join(lines)
+        preview = [f"• **{name}** `ID: {appid}`" for name, appid in games_list[:8]]
+        games_text = "\n".join(preview)
+        if len(games_list) > 8:
+            games_text += f"\n\n_... e mais {len(games_list) - 8} jogos no menu do ticket_"
     else:
         games_text = "_Nenhum jogo configurado nas fontes._"
 
@@ -436,16 +661,16 @@ def _build_ativar_embed():
         title="JP Steam Launcher — Ativação de Jogos",
         description=(
             "Clique no botão abaixo para abrir um **ticket privado** de ativação.\n\n"
-            "No ticket, envie o **ID ou nome do jogo** e receba automaticamente:\n"
+            "No ticket, **escolha no menu** ou envie o **ID/nome do jogo** e receba automaticamente:\n"
             "• Passo a passo de instalação\n"
             "• Links para download (Secret Sauce, arquivos do jogo)\n"
             "• Instruções específicas para cada jogo\n\n"
-            "**Jogos disponíveis nas fontes:**"
+            f"**{len(games_list)} jogos disponíveis** (Steam, EA, Ubisoft):"
         ),
         color=0x6366f1,
     )
     embed.add_field(
-        name="📋 Lista de jogos",
+        name="📋 Alguns jogos",
         value=games_text[:1024] + ("..." if len(games_text) > 1024 else ""),
         inline=False,
     )
