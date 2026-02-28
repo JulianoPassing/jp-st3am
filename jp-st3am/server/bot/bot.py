@@ -11,7 +11,7 @@ import json
 import re
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -169,17 +169,13 @@ def _get_all_games_from_sources():
 def _get_games_by_platform():
     """Retorna jogos agrupados por plataforma: {platform: [(name, appid), ...]}."""
     catalog = _load_catalog()
-    seen = set()
     result = {"steam": [], "ea": [], "ubisoft": []}
 
     for platform in ("steam", "ea", "ubisoft"):
         for g in catalog.get(platform, []):
             name = g.get("name") or "?"
             appid = str(g.get("appid", "")).strip()
-            key = appid if appid else name
-            if key and key not in seen:
-                seen.add(key)
-                result[platform].append((name, appid if appid else name))
+            result[platform].append((name, appid if appid else name))
 
     for platform in result:
         result[platform] = sorted(result[platform], key=lambda x: (x[0] or "?").upper())
@@ -306,8 +302,8 @@ def _build_activation_response(game, default, api_base):
     key = _generate_launcher_key() if send_key else None
 
     embed = discord.Embed(
-        title=f"Ativação: {game.get('name', '?')}",
-        description=f"**App ID:** {game.get('appid', '?')}\n**Tipo:** {game.get('type', 'steam')}",
+        title=f"🎮 {game.get('name', '?')}",
+        description=f"**App ID:** `{game.get('appid', '?')}` • **Tipo:** {game.get('type', 'steam').replace('_', ' ').title()}",
         color=0x10b981,
     )
 
@@ -606,20 +602,23 @@ class AbrirTicketView(View):
 
         games_by_platform = _get_games_by_platform()
 
+        total_jogos = sum(len(g) for g in games_by_platform.values())
         embed_inicial = discord.Embed(
-            title="Ticket de Ativação — JP Steam Launcher",
+            title="🎮 Ticket de Ativação",
             description=(
-                "**Escolha um jogo no menu abaixo** ou envie o ID/nome.\n\n"
-                "O bot responderá automaticamente com:\n"
-                "• Passo a passo de instalação\n"
-                "• Links (Anadius, Origin Emulator, etc.)\n"
-                "• Instruções específicas do jogo\n\n"
-                "Digite **ferramentas** para ver todos os links de ativação."
+                "Bem-vindo ao **JP Steam Launcher**. Selecione um jogo pelo menu ou digite o **ID/nome**.\n\n"
+                "**O que você recebe:**\n"
+                "▸ Passo a passo completo de instalação\n"
+                "▸ Links diretos (Origin Emulator, Anadius, etc.)\n"
+                "▸ Instruções específicas por jogo\n\n"
+                "**Comando:** Digite `ferramentas` para ver todos os links de ativação.\n\n"
+                f"**{total_jogos} jogos** disponíveis em Steam, EA e Ubisoft."
             ),
-            color=0x6366f1,
+            color=0x1e3a5f,
         )
         embed_inicial.set_image(url=BANNER_URL)
-        embed_inicial.set_footer(text="Use o menu para escolher um jogo ou digite o ID/nome...")
+        embed_inicial.set_footer(text="JP Steam Launcher • Use o menu ou digite o ID/nome do jogo")
+        embed_inicial.timestamp = datetime.now(timezone.utc)
 
         await thread.send(content=f"{user.mention}", embed=embed_inicial)
 
@@ -631,7 +630,8 @@ class AbrirTicketView(View):
             view = PlatformJogosSelectView(platform=platform, jogos=jogos)
             if view.children:
                 label = PLATFORM_LABELS.get(platform, platform.title())
-                await thread.send(content=f"🎮 **{label}** ({len(jogos)} jogos)", view=view)
+                emoji = {"steam": "🎮", "ea": "⚽", "ubisoft": "🦅"}.get(platform, "🎮")
+                await thread.send(content=f"{emoji} **{label}** — {len(jogos)} jogos", view=view)
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -689,15 +689,15 @@ async def on_message(message):
         if txt_attach:
             await message.channel.typing()
             embed = discord.Embed(
-                title="Ticket recebido",
+                title="📄 Ticket Denuvo Recebido",
                 description=(
-                    "Arquivo de ticket Denuvo recebido.\n\n"
-                    "Um administrador irá processar e enviar o token aqui.\n"
+                    "Arquivo `.txt` recebido com sucesso.\n\n"
+                    "Um administrador irá processar e enviar o **token** aqui.\n"
                     "Aguarde a resposta neste chat."
                 ),
                 color=0x2563eb,
             )
-            embed.set_footer(text="Envie o token gerado para o usuário quando estiver pronto.")
+            embed.set_footer(text="JP Steam Launcher • Token será enviado por um administrador")
             await message.channel.send(embed=embed)
             await bot.process_commands(message)
             return
@@ -726,11 +726,11 @@ async def on_message(message):
                 lbl = labels.get(k, k.replace("_", " ").title())
                 lines.append(f"**{lbl}:** {url}")
             embed = discord.Embed(
-                title="Ferramentas de ativação",
-                description="Links diretos — use conforme o jogo.\n\n" + "\n".join(lines),
-                color=0x10b981,
+                title="🔧 Ferramentas de Ativação",
+                description="Links diretos — use conforme o tipo de jogo.\n\n" + "\n".join(lines),
+                color=0x1e3a5f,
             )
-            embed.set_footer(text="Origin Helper: instale Violentmonkey, depois o script. Na EA.com com conta do jogo, gere o token.")
+            embed.set_footer(text="Origin Helper: Violentmonkey + EA.com com conta do jogo para gerar token")
             await message.channel.send(embed=embed)
             return
 
@@ -782,14 +782,14 @@ def _build_ativar_embed():
     embed = discord.Embed(
         title="JP Steam Launcher — Ativação de Jogos",
         description=(
-            "Clique no botão abaixo para abrir um **ticket privado** de ativação.\n\n"
-            "No ticket, **escolha no menu por plataforma** (Steam, EA, Ubisoft) ou envie o **ID/nome do jogo**.\n"
-            "• Passo a passo de instalação\n"
-            "• Links (Anadius, Origin Emulator, etc.)\n"
-            "• Instruções específicas para cada jogo\n\n"
-            f"**{total} jogos disponíveis**"
+            "Abra um **ticket privado** para receber instruções de ativação.\n\n"
+            "**No ticket você pode:**\n"
+            "▸ Escolher por plataforma (Steam, EA, Ubisoft)\n"
+            "▸ Receber passo a passo + links automáticos\n"
+            "▸ Digitar o ID ou nome do jogo\n\n"
+            f"**{total} jogos** disponíveis"
         ),
-        color=0x6366f1,
+        color=0x1e3a5f,
     )
     if fields:
         for name, value in fields:
@@ -797,7 +797,8 @@ def _build_ativar_embed():
     else:
         embed.add_field(name="📋 Jogos", value="_Nenhum jogo configurado._", inline=False)
     embed.set_image(url=BANNER_URL)
-    embed.set_footer(text="Use o ID numérico ou nome do jogo no ticket")
+    embed.set_footer(text="JP Steam Launcher • Clique no botão para abrir o ticket")
+    embed.timestamp = datetime.now(timezone.utc)
     return embed
 
 
