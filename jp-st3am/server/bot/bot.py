@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import Button, View
+from discord.ui import Button, Select, View
 
 from .config import (
     DISCORD_GUILD_ID,
@@ -186,6 +186,53 @@ def _build_activation_response(game, default, api_base):
     return embed
 
 
+class JogosSelectView(View):
+    """Menu Select clicável com jogos disponíveis para ativação."""
+
+    def __init__(self, jogos=None):
+        super().__init__(timeout=None)
+        games_list = jogos if jogos is not None else _get_activation_games_list()
+        options = []
+        for name, appid in games_list[:25]:  # Discord limita a 25 opções
+            if not appid:
+                continue
+            label = (name or "?")[:100]
+            value = str(appid)[:100]
+            options.append(discord.SelectOption(label=label, value=value, description=f"ID: {appid}"))
+        if not options:
+            options = [discord.SelectOption(label="Nenhum jogo configurado", value="0")]
+        select = Select(
+            custom_id="jogos_select_ativacao",
+            placeholder="Clique para escolher um jogo...",
+            options=options,
+        )
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction, select: Select):
+        value = select.values[0] if select.values else None
+        if not value or value == "0":
+            await interaction.response.send_message(
+                "Nenhum jogo selecionado. Use o menu ou digite o ID/nome.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+
+        game, default = _find_game_by_id_or_name(value)
+        if not game:
+            await interaction.followup.send(
+                f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
+                ephemeral=False,
+            )
+            return
+
+        api_base = get_api_url().rstrip("/")
+        embed = _build_activation_response(game, default, api_base)
+        await interaction.followup.send(embed=embed)
+
+
 class AbrirTicketView(View):
     """Botão para abrir ticket de ativação."""
 
@@ -265,33 +312,23 @@ class AbrirTicketView(View):
                     pass
 
         games_list = _get_activation_games_list()
-        if games_list:
-            lines = [f"• **{name}** — `{appid}`" for name, appid in games_list]
-            games_text = "\n".join(lines)
-        else:
-            games_text = "_Nenhum jogo configurado._"
 
         embed_inicial = discord.Embed(
             title="Ticket de Ativação — JP Steam Launcher",
             description=(
-                "**Envie o ID ou o nome do jogo** que deseja ativar.\n\n"
+                "**Escolha um jogo no menu abaixo** ou envie o ID/nome.\n\n"
                 "O bot responderá automaticamente com:\n"
                 "• Passo a passo de instalação\n"
                 "• Links para download\n"
-                "• Instruções específicas do jogo\n\n"
-                "**Jogos disponíveis:**"
+                "• Instruções específicas do jogo"
             ),
             color=0x6366f1,
         )
-        embed_inicial.add_field(
-            name="📋 Lista",
-            value=games_text[:1024] + ("..." if len(games_text) > 1024 else ""),
-            inline=False,
-        )
         embed_inicial.set_image(url=BANNER_URL)
-        embed_inicial.set_footer(text="Aguardando sua mensagem...")
+        embed_inicial.set_footer(text="Use o menu para escolher um jogo ou digite o ID/nome...")
 
-        await thread.send(content=f"{user.mention}", embed=embed_inicial)
+        view = JogosSelectView(jogos=games_list) if games_list else JogosSelectView()
+        await thread.send(content=f"{user.mention}", embed=embed_inicial, view=view)
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -311,6 +348,7 @@ class JPSteamBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         self.add_view(AbrirTicketView())
+        self.add_view(JogosSelectView())  # Persistência do menu de jogos em tickets antigos
         print(f"Comandos sincronizados no servidor {DISCORD_GUILD_ID}")
 
     async def on_ready(self):
