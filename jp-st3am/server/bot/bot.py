@@ -354,6 +354,16 @@ MAX_PAGES = 8         # 8 páginas = 1000 jogos no menu
 PLATFORM_LABELS = {"steam": "Steam", "ea": "EA", "ubisoft": "Ubisoft"}
 
 
+def _lookup_value_from_select(value):
+    """Remove sufixo _N de valores duplicados para lookup."""
+    if not value or "_" not in value:
+        return value
+    parts = value.rsplit("_", 1)
+    if len(parts) == 2 and parts[1].isdigit():
+        return parts[0]
+    return value
+
+
 class FeedbackAtivacaoView(View):
     """Botões Deu certo / Não deu após instruções de ativação."""
 
@@ -409,10 +419,17 @@ class CombinedTicketView(View):
                 if selects_added >= 5:
                     break
                 options = []
+                seen_values = set()
                 for name, val in chunk:
-                    value = str(val)[:100] if val else ""
-                    if not value or not (name or "?").strip():
+                    base_val = str(val)[:100] if val else (name or "?")[:100]
+                    if not base_val or not (name or "?").strip():
                         continue
+                    value = base_val
+                    n = 0
+                    while value in seen_values:
+                        n += 1
+                        value = f"{base_val}_{n}"[:100]
+                    seen_values.add(value)
                     label = (name or "?")[:100]
                     desc = f"ID: {val}" if val and val.isdigit() else ""
                     options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
@@ -434,7 +451,7 @@ class CombinedTicketView(View):
                 await interaction.response.send_message("Nenhum jogo selecionado. Digite o ID/nome.", ephemeral=True)
                 return
             await interaction.response.defer()
-            game, default = _find_game_by_id_or_name(value)
+            game, default = _find_game_by_id_or_name(_lookup_value_from_select(value))
             if not game:
                 await interaction.followup.send(f"Jogo não encontrado: `{value}`. Tente novamente.", ephemeral=False)
                 return
@@ -468,10 +485,17 @@ class PlatformJogosSelectView(View):
         label_platform = PLATFORM_LABELS.get(platform, platform.title())
         for idx, chunk in enumerate(chunks):
             options = []
+            seen_values = set()
             for name, val in chunk:
-                value = str(val)[:100] if val else ""
-                if not value or not (name or "?").strip():
+                base_val = str(val)[:100] if val else (name or "?")[:100]
+                if not base_val or not (name or "?").strip():
                     continue
+                value = base_val
+                n = 0
+                while value in seen_values:
+                    n += 1
+                    value = f"{base_val}_{n}"[:100]
+                seen_values.add(value)
                 label = (name or "?")[:100]
                 desc = f"ID: {val}" if val and val.isdigit() else ""
                 options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
@@ -504,17 +528,17 @@ class PlatformJogosSelectView(View):
                 return
 
             await interaction.response.defer()
-            game, default = _find_game_by_id_or_name(value)
+            game, default = _find_game_by_id_or_name(_lookup_value_from_select(value))
             if not game:
                 await interaction.followup.send(
-                    f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
+                    f"Jogo não encontrado. Tente novamente ou digite o ID/nome.",
                     ephemeral=False,
                 )
                 return
 
             api_base = get_api_url().rstrip("/")
             embed = _build_activation_response(game, default, api_base)
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=FeedbackAtivacaoView())
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -552,10 +576,17 @@ class JogosSelectView(View):
 
         for idx, chunk in enumerate(chunks):
             options = []
+            seen_values = set()
             for name, val in chunk:
-                value = str(val)[:100] if val else ""
-                if not value or not (name or "?").strip():
+                base_val = str(val)[:100] if val else (name or "?")[:100]
+                if not base_val or not (name or "?").strip():
                     continue
+                value = base_val
+                n = 0
+                while value in seen_values:
+                    n += 1
+                    value = f"{base_val}_{n}"[:100]
+                seen_values.add(value)
                 label = (name or "?")[:100]
                 desc = f"ID: {val}" if val and val.isdigit() else ""
                 options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
@@ -591,10 +622,10 @@ class JogosSelectView(View):
 
             await interaction.response.defer()
 
-            game, default = _find_game_by_id_or_name(value)
+            game, default = _find_game_by_id_or_name(_lookup_value_from_select(value))
             if not game:
                 await interaction.followup.send(
-                    f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
+                    f"Jogo não encontrado. Tente novamente ou digite o ID/nome.",
                     ephemeral=False,
                 )
                 return
