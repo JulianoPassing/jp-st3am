@@ -1,15 +1,15 @@
 {
+  "send_launcher_key": false,
   "games": [
     {
       "appid": "3764200",
       "name": "Resident Evil Requiem",
       "type": "steam",
-      "gera_key": true,
       "steps": [
-        "1. Use a key do launcher abaixo para ativar o JP Steam Launcher",
-        "2. Baixe o launcher: use o link de download",
-        "3. No launcher, busque 'Resident Evil Requiem' ou cole o ID 3764200",
-        "4. Clique em Instalar e siga as instruções"
+        "1. Baixe o launcher (link abaixo)",
+        "2. No launcher, busque 'Resident Evil Requiem' ou ID 3764200",
+        "3. Clique em Instalar e siga as instruções",
+        "4. Sem ativação extra necessária"
       ],
       "links": {
         "launcher": "/download/launcher-completo"
@@ -19,18 +19,17 @@
       "appid": "1349630",
       "name": "Need for Speed Unbound",
       "type": "denuvo_ticket",
-      "gera_key": true,
       "steps": [
-        "1. Use a key do launcher abaixo para ativar o JP Steam Launcher",
-        "2. Baixe os arquivos do jogo (links na fonte)",
-        "3. Baixe o Secret Sauce e extraia na pasta do jogo",
-        "4. Renomeie: GAME.exe → GAME-original.exe | GAME fixed.exe → GAME.exe",
-        "5. Execute GAME.exe - será gerado um arquivo de ticket .txt",
-        "6. Envie o arquivo de ticket aqui neste chat e aguarde o token"
+        "1. Baixe os arquivos do jogo (link abaixo)",
+        "2. Baixe o Secret Sauce e extraia na pasta do jogo",
+        "3. Renomeie: GAME.exe → GAME-original.exe | GAME fixed.exe → GAME.exe",
+        "4. Execute GAME.exe - será gerado um arquivo de ticket .txt",
+        "5. Envie o arquivo de ticket aqui neste chat e aguarde o token"
       ],
       "links": {
         "jogo": "https://multiup.io/7f19828db19c75b93bdfe631e0f70c46",
         "secret_sauce": "https://gofile.io/d/Qruo4g",
+        "secret_sauce_2": "https://gofile.io/d/f3mWug",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -38,14 +37,12 @@
       "appid": "1716730",
       "name": "Dead Space Remake",
       "type": "denuvo_ticket",
-      "gera_key": true,
       "steps": [
-        "1. Use a key do launcher abaixo",
-        "2. Baixe os arquivos do jogo (Steam) + arquivos de conversão EA",
-        "3. Baixe o Secret Sauce e extraia na pasta do jogo",
-        "4. Renomeie o executável conforme instruções do jogo",
-        "5. Execute e gere o ticket .txt",
-        "6. Envie o ticket aqui e aguarde o token"
+        "1. Baixe os arquivos do jogo (Steam) + arquivos de conversão EA",
+        "2. Baixe o Secret Sauce e extraia na pasta do jogo",
+        "3. Renomeie o executável conforme instruções do jogo",
+        "4. Execute e gere o ticket .txt",
+        "5. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
         "launcher": "/download/launcher-completo"
@@ -55,12 +52,10 @@
       "appid": "2358720",
       "name": "Black Myth: Wukong",
       "type": "bypass",
-      "gera_key": true,
       "steps": [
-        "1. Use a key do launcher abaixo",
-        "2. Baixe o jogo e o bypass (verifique o canal de instruções)",
-        "3. Extraia o bypass na pasta do jogo",
-        "4. Execute o jogo"
+        "1. Baixe o jogo e o bypass (verifique o canal de instruções)",
+        "2. Extraia o bypass na pasta do jogo",
+        "3. Execute o jogo"
       ],
       "links": {
         "launcher": "/download/launcher-completo"
@@ -68,9 +63,8 @@
     }
   ],
   "default": {
-    "gera_key": true,
     "steps": [
-      "1. Use a key do launcher abaixo",
+      "1. Baixe o launcher (link abaixo)",
       "2. Abra o JP Steam Launcher e busque pelo ID ou nome do jogo",
       "3. Clique em Instalar"
     ],

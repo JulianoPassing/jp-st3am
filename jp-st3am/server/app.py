@@ -336,37 +336,228 @@ def api_sync_gamelist():
         return jsonify({"error": str(e)}), 500
 
 
+BANNER_URL = "https://i.imgur.com/HqiZILA.jpeg"
+
+
+def _get_games_by_letter():
+    """Retorna jogos disponíveis (games_activation) agrupados por letra, ordem alfabética."""
+    activation = _load_activation_config()
+    games = activation.get("games", [])
+    games = sorted(games, key=lambda g: (g.get("name") or "?").upper())
+    by_letter = {}
+    type_labels = {"steam": "Steam", "denuvo_ticket": "Denuvo", "bypass": "Bypass"}
+    for g in games:
+        name = g.get("name", "?")
+        first = name[0].upper() if name else "#"
+        if first not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            first = "#"
+        if first not in by_letter:
+            by_letter[first] = []
+        by_letter[first].append({
+            "name": name,
+            "appid": g.get("appid", ""),
+            "type": type_labels.get(g.get("type", ""), g.get("type", "")),
+        })
+    return dict(sorted(by_letter.items()))
+
+
 @app.route("/panel")
 def panel():
     """Painel web com jogos e opções."""
     activation = _load_activation_config()
+    games_by_letter = _get_games_by_letter()
+    games_total = sum(len(v) for v in games_by_letter.values())
+
+    def render_games_html():
+        if not games_by_letter:
+            return '<p class="empty">Nenhum jogo disponível nas fontes. Edite <code>data/games_activation.json</code></p>'
+        html = []
+        for letter, games in games_by_letter.items():
+            items = "".join(
+                f'<li><span class="game-name">{g["name"]}</span> '
+                f'<span class="game-id">ID: {g["appid"]}</span> '
+                f'<span class="game-type">{g["type"]}</span></li>'
+                for g in games
+            )
+            html.append(f'<div class="letter-group"><h3>{letter}</h3><ul>{items}</ul></div>')
+        return "\n".join(html)
+
     return f"""
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JP Steam Launcher - Painel</title>
+    <title>JP Steam Launcher - Painel de Ativações</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: system-ui, sans-serif; background: #1a1a1a; color: #fff; min-height: 100vh; padding: 24px; }}
-        .container {{ max-width: 900px; margin: 0 auto; }}
-        h1 {{ color: #2563eb; margin-bottom: 24px; font-size: 1.5rem; }}
-        .card {{ background: #252525; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 1px solid #333; }}
-        .card h2 {{ font-size: 1rem; margin-bottom: 12px; color: #b0b0b0; }}
-        a {{ color: #2563eb; text-decoration: none; }}
-        a:hover {{ text-decoration: underline; }}
-        .btn {{ display: inline-block; background: #2563eb; color: #fff; padding: 10px 20px; border-radius: 6px; margin-top: 8px; }}
-        .btn:hover {{ background: #1d4ed8; }}
-        ul {{ list-style: none; }}
-        li {{ padding: 6px 0; border-bottom: 1px solid #333; }}
-        li:last-child {{ border: none; }}
-        .meta {{ font-size: 0.85rem; color: #888; margin-top: 4px; }}
+        :root {{
+            --bg-dark: #0f0f12;
+            --bg-card: #16161a;
+            --bg-card-hover: #1c1c21;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --text: #e4e4e7;
+            --text-muted: #71717a;
+            --border: #27272a;
+        }}
+        body {{
+            font-family: 'Outfit', system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }}
+        .banner {{
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            display: block;
+        }}
+        .container {{
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 40px;
+        }}
+        .header h1 {{
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }}
+        .header p {{
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }}
+        .card {{
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            transition: border-color 0.2s;
+        }}
+        .card:hover {{
+            border-color: #3f3f46;
+        }}
+        .card h2 {{
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--accent), #4f46e5);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }}
+        .btn:hover {{
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }}
+        .letter-group {{
+            margin-bottom: 24px;
+        }}
+        .letter-group:last-child {{
+            margin-bottom: 0;
+        }}
+        .letter-group h3 {{
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }}
+        .letter-group ul {{
+            list-style: none;
+        }}
+        .letter-group li {{
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }}
+        .letter-group li:last-child {{
+            border-bottom: none;
+        }}
+        .game-name {{
+            font-weight: 500;
+            flex: 1;
+            min-width: 180px;
+        }}
+        .game-id {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }}
+        .game-type {{
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent);
+        }}
+        .empty {{
+            color: var(--text-muted);
+            padding: 24px;
+        }}
+        .empty code {{
+            background: var(--bg-dark);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }}
+        .api-list {{
+            list-style: none;
+        }}
+        .api-list li {{
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }}
+        .api-list li:last-child {{
+            border: none;
+        }}
+        a {{
+            color: var(--accent);
+            text-decoration: none;
+        }}
+        a:hover {{
+            color: var(--accent-hover);
+        }}
+        .badge {{
+            display: inline-block;
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+        }}
     </style>
 </head>
 <body>
+    <img src="{BANNER_URL}" alt="JP Steam Launcher" class="banner">
     <div class="container">
-        <h1>JP Steam Launcher - Painel</h1>
+        <div class="header">
+            <h1>JP Steam Launcher</h1>
+            <p>Painel de ativações — {games_total} jogos disponíveis nas fontes</p>
+        </div>
         
         <div class="card">
             <h2>Download</h2>
@@ -374,19 +565,19 @@ def panel():
         </div>
         
         <div class="card">
-            <h2>Jogos com ativação especial</h2>
-            <ul>
-                {"".join(f'<li><strong>{g.get("name", "?")}</strong> (ID: {g.get("appid", "")}) - {g.get("type", "?")}<span class="meta">{g.get("instructions", "")}</span></li>' for g in activation.get("games", [])) or "<li>Nenhum jogo configurado. Edite data/games_activation.json</li>"}
-            </ul>
-            <p class="meta" style="margin-top:12px">Config: data/games_activation.json</p>
+            <h2>Jogos disponíveis para ativação</h2>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:20px">
+                Lista em ordem alfabética. Use o ID no Discord com /ativar.
+            </p>
+            {render_games_html()}
         </div>
         
         <div class="card">
             <h2>API</h2>
-            <ul>
-                <li><a href="/api/games/search">/api/games/search?q=nome</a> - Buscar jogos</li>
-                <li><a href="/api/games/activation">/api/games/activation</a> - Jogos com ativação</li>
-                <li><a href="/health">/health</a> - Status</li>
+            <ul class="api-list">
+                <li><a href="/api/games/search">/api/games/search?q=nome</a> — Buscar jogos</li>
+                <li><a href="/api/games/activation">/api/games/activation</a> — Jogos com ativação</li>
+                <li><a href="/health">/health</a> — Status <span class="badge">OK</span></li>
             </ul>
         </div>
     </div>

@@ -32,6 +32,7 @@ from .config import (
 GAMELIST_URL = "https://raw.githubusercontent.com/SteamTools-Team/GameList/main/games.json"
 GAMES_CACHE_PATH = os.path.join(SERVER_DIR, "data", "games_cache.json")
 ACTIVATION_CONFIG_PATH = os.path.join(SERVER_DIR, "data", "games_activation.json")
+BANNER_URL = "https://i.imgur.com/HqiZILA.jpeg"
 
 # Threads de ativação (thread_id). Também identificamos por nome "ativacao-"
 activation_threads = set()
@@ -89,6 +90,14 @@ def _fetch_gamelist():
         return []
 
 
+def _get_activation_games_list():
+    """Retorna lista de jogos disponíveis (ordem alfabética) para exibir no embed."""
+    cfg = _load_activation_config()
+    games = cfg.get("games", [])
+    games = sorted(games, key=lambda g: (g.get("name") or "?").upper())
+    return [(g.get("name", "?"), g.get("appid", "")) for g in games]
+
+
 def _find_game_by_id_or_name(query):
     """Busca jogo em games_activation primeiro, depois no gamelist."""
     q = (query or "").strip()
@@ -129,25 +138,20 @@ def _generate_launcher_key():
 
 
 def _build_activation_response(game, default, api_base):
-    """Monta embed com key, steps e links."""
-    gera_key = game.get("gera_key", default.get("gera_key", True))
+    """Monta embed com ativação do jogo: steps e links (sem key do launcher)."""
+    cfg = _load_activation_config()
+    send_key = cfg.get("send_launcher_key", False) or game.get("gera_key", False) or default.get("gera_key", False)
+
     steps = game.get("steps", default.get("steps", []))
     links = game.get("links", default.get("links", {}))
 
-    key = _generate_launcher_key() if gera_key else None
+    key = _generate_launcher_key() if send_key else None
 
     embed = discord.Embed(
         title=f"Ativação: {game.get('name', '?')}",
         description=f"**App ID:** {game.get('appid', '?')}\n**Tipo:** {game.get('type', 'steam')}",
         color=0x10b981,
     )
-
-    if key:
-        embed.add_field(
-            name="🔑 Key do Launcher",
-            value=f"```\n{key}\n```\n1 key = 1 PC. Use no JP Steam Launcher.",
-            inline=False,
-        )
 
     if steps:
         embed.add_field(
@@ -157,7 +161,12 @@ def _build_activation_response(game, default, api_base):
         )
 
     link_lines = []
-    label_display = {"launcher": "Launcher", "jogo": "Arquivos do jogo", "secret_sauce": "Secret Sauce"}
+    label_display = {
+        "launcher": "Launcher",
+        "jogo": "Arquivos do jogo",
+        "secret_sauce": "Secret Sauce",
+        "secret_sauce_2": "Secret Sauce (alt)",
+    }
     for label, url in links.items():
         if url.startswith("/"):
             url = f"{api_base.rstrip('/')}{url}"
@@ -166,13 +175,14 @@ def _build_activation_response(game, default, api_base):
     if link_lines:
         embed.add_field(name="🔗 Links", value="\n".join(link_lines), inline=False)
 
-    embed.add_field(
-        name="📥 Download do Launcher",
-        value=f"[Baixar ZIP completo]({api_base}/download/launcher-completo)",
-        inline=False,
-    )
+    if key:
+        embed.add_field(
+            name="🔑 Key do Launcher (opcional)",
+            value=f"```\n{key}\n```\nUse se precisar do launcher.",
+            inline=False,
+        )
 
-    embed.set_footer(text="Guarde sua key. Em caso de dúvidas, abra outro ticket.")
+    embed.set_footer(text="Para jogos Denuvo: envie o arquivo .txt do ticket aqui e aguarde o token.")
     return embed
 
 
@@ -254,19 +264,31 @@ class AbrirTicketView(View):
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
+        games_list = _get_activation_games_list()
+        if games_list:
+            lines = [f"• **{name}** — `{appid}`" for name, appid in games_list]
+            games_text = "\n".join(lines)
+        else:
+            games_text = "_Nenhum jogo configurado._"
+
         embed_inicial = discord.Embed(
-            title="Ticket de Ativação - JP Steam Launcher",
+            title="Ticket de Ativação — JP Steam Launcher",
             description=(
-                "**Envie o ID do jogo ou o nome do jogo** que você quer ativar.\n\n"
-                "Exemplos:\n"
-                "• `1349630` (Need for Speed Unbound)\n"
-                "• `Need for Speed`\n"
-                "• `Black Myth`\n"
-                "• `3764200` (Resident Evil Requiem)\n\n"
-                "O bot responderá automaticamente com a key e o passo a passo."
+                "**Envie o ID ou o nome do jogo** que deseja ativar.\n\n"
+                "O bot responderá automaticamente com:\n"
+                "• Passo a passo de instalação\n"
+                "• Links para download\n"
+                "• Instruções específicas do jogo\n\n"
+                "**Jogos disponíveis:**"
             ),
-            color=0x2563eb,
+            color=0x6366f1,
         )
+        embed_inicial.add_field(
+            name="📋 Lista",
+            value=games_text[:1024] + ("..." if len(games_text) > 1024 else ""),
+            inline=False,
+        )
+        embed_inicial.set_image(url=BANNER_URL)
         embed_inicial.set_footer(text="Aguardando sua mensagem...")
 
         await thread.send(content=f"{user.mention}", embed=embed_inicial)
@@ -318,9 +340,26 @@ async def on_message(message):
         )
     )
     if is_activation_thread:
+        txt_attach = next((a for a in (message.attachments or []) if a.filename.lower().endswith(".txt")), None)
+        if txt_attach:
+            await message.channel.typing()
+            embed = discord.Embed(
+                title="Ticket recebido",
+                description=(
+                    "Arquivo de ticket Denuvo recebido.\n\n"
+                    "Um administrador irá processar e enviar o token aqui.\n"
+                    "Aguarde a resposta neste chat."
+                ),
+                color=0x2563eb,
+            )
+            embed.set_footer(text="Envie o token gerado para o usuário quando estiver pronto.")
+            await message.channel.send(embed=embed)
+            await bot.process_commands(message)
+            return
+
         query = message.content.strip()
         if not query or len(query) > 200:
-            await message.channel.send("Envie um ID (ex: 1349630) ou nome do jogo.")
+            await message.channel.send("Envie um ID (ex: 1349630), nome do jogo, ou o arquivo .txt do ticket.")
             return
 
         await message.channel.typing()
@@ -346,12 +385,42 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
+def _build_ativar_embed():
+    """Monta embed profissional para /ativar com banner e lista de jogos."""
+    games_list = _get_activation_games_list()
+    if games_list:
+        lines = [f"• **{name}** `ID: {appid}`" for name, appid in games_list]
+        games_text = "\n".join(lines)
+    else:
+        games_text = "_Nenhum jogo configurado nas fontes._"
+
+    embed = discord.Embed(
+        title="JP Steam Launcher — Ativação de Jogos",
+        description=(
+            "Clique no botão abaixo para abrir um **ticket privado** de ativação.\n\n"
+            "No ticket, envie o **ID ou nome do jogo** e receba automaticamente:\n"
+            "• Passo a passo de instalação\n"
+            "• Links para download (Secret Sauce, arquivos do jogo)\n"
+            "• Instruções específicas para cada jogo\n\n"
+            "**Jogos disponíveis nas fontes:**"
+        ),
+        color=0x6366f1,
+    )
+    embed.add_field(
+        name="📋 Lista de jogos",
+        value=games_text[:1024] + ("..." if len(games_text) > 1024 else ""),
+        inline=False,
+    )
+    embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Use o ID numérico ou nome do jogo no ticket")
+    return embed
+
+
 @bot.tree.command(name="ativar", description="Abre ticket para ativação automática de jogos")
 async def ativar(interaction: discord.Interaction):
     """Mostra botão para abrir ticket de ativação."""
     await interaction.response.send_message(
-        "Clique no botão para abrir um ticket de ativação. "
-        "No ticket, envie o **ID ou nome do jogo** e receba a key + passo a passo automaticamente.",
+        embed=_build_ativar_embed(),
         view=AbrirTicketView(),
         ephemeral=False,
     )
