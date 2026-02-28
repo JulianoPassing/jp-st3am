@@ -4,7 +4,77 @@
     "anadius_origin_emu": "https://mirror.anadius.cc/origin-emulator",
     "anadius_origin_helper": "https://mirror.anadius.cc/origin-helper",
     "anadius_dlc_unlockers": "https://mirror.anadius.cc/dlc-unlockers",
+    "anadius_origin_unwrapper": "https://mirror.anadius.cc/origin-unwrapper",
     "goldberg_emu": "https://gitlab.com/Mr_Goldberg/goldberg_emulator"
+  },
+  "ferramentas_instrucoes": {
+    "origin_emulator": {
+      "titulo": "Origin Emulator",
+      "url": "https://mirror.anadius.cc/origin-emulator",
+      "descricao": "Permite jogar jogos protegidos por Origin/EA sem o app. Para jogos com Denuvo, você precisa de um token válido.",
+      "passos": [
+        "1. Baixe o Origin Emulator (links abaixo)",
+        "2. Use o Origin Unwrapper para desencriptar o exe e adicionar o emu (link abaixo)",
+        "3. Extraia os arquivos na pasta do jogo",
+        "4. Para Denuvo: execute o jogo, gere o ticket .txt, envie aqui e aguarde o token",
+        "5. Coloque o token em anadius.cfg"
+      ],
+      "downloads": {
+        "Windows (v2.0.1.0)": "https://mirror.anadius.cc/attachments/Origin%20emu%20(v2.0.1.0).7z",
+        "macOS (v2.0.0.0)": "https://mirror.anadius.cc/attachments/Origin%20emu%20(v2.0.0.0)%20macOS.7z",
+        "Config + ferramentas": "https://mirror.anadius.cc/attachments/example%20config%20+%20tools.7z",
+        "Origin Unwrapper": "https://mirror.anadius.cc/origin-unwrapper"
+      }
+    },
+    "origin_helper": {
+      "titulo": "Origin Helper",
+      "url": "https://mirror.anadius.cc/origin-helper",
+      "descricao": "UserScript que adiciona funções ao site da EA. Use para gerar tokens Denuvo (precisa ter o jogo na conta).",
+      "passos": [
+        "1. Instale Violentmonkey (Chrome) ou Greasemonkey (Firefox)",
+        "2. Acesse mirror.anadius.cc/origin-helper e instale o script",
+        "3. Entre na EA.com com sua conta que possui o jogo",
+        "4. Clique em 'Origin Helper' (canto superior esquerdo)",
+        "5. Use 'Generate Denuvo token' para gerar o token"
+      ],
+      "downloads": {
+        "Página do script": "https://mirror.anadius.cc/origin-helper",
+        "Violentmonkey (Chrome)": "https://chrome.google.com/webstore/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag",
+        "Greasemonkey (Firefox)": "https://addons.mozilla.org/firefox/addon/greasemonkey/"
+      }
+    },
+    "dlc_unlockers": {
+      "titulo": "EA DLC Unlockers",
+      "url": "https://mirror.anadius.cc/dlc-unlockers",
+      "descricao": "Desbloqueia DLCs para jogos legítimos da EA (Sims 4, Cities Skylines, etc.).",
+      "passos": [
+        "1. Baixe os arquivos DLC se necessário (Sims 4 exige)",
+        "2. Baixe o EA DLC Unlocker (link abaixo)",
+        "3. Execute o instalador e selecione 'Add/Update game config'",
+        "4. Escolha o jogo e clique em 'Install'",
+        "5. Execute setup.bat (duplo clique)"
+      ],
+      "downloads": {
+        "EA DLC Unlocker v2 (Win/Linux)": "https://filecrypt.cc/Container/F9EB61000E.html",
+        "Sims 4 DLC only": "https://mirror.anadius.cc/sims-4-dlc-only",
+        "Página completa": "https://mirror.anadius.cc/dlc-unlockers"
+      }
+    },
+    "goldberg": {
+      "titulo": "Goldberg Steam Emulator",
+      "url": "https://gitlab.com/Mr_Goldberg/goldberg_emulator",
+      "descricao": "Emulador Steam para jogos sem Steam. Use em jogos que exigem Steam para rodar.",
+      "passos": [
+        "1. Baixe em mr_goldberg.gitlab.io/goldberg_emulator",
+        "2. Extraia na pasta do jogo",
+        "3. Configure conforme o README",
+        "4. Execute o jogo"
+      ],
+      "downloads": {
+        "Site oficial": "https://mr_goldberg.gitlab.io/goldberg_emulator/",
+        "GitLab": "https://gitlab.com/Mr_Goldberg/goldberg_emulator"
+      }
+    }
   },
   "games": [
     {

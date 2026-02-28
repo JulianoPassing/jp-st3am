@@ -849,29 +849,59 @@ async def on_message(message):
 
         # Resposta rápida: ferramentas/links
         q_lower = query.lower()
-        if q_lower in ("ferramentas", "links", "anadius", "tools"):
+        if q_lower in ("ferramentas", "links", "anadius", "tools") or (len(q_lower) < 30 and ("ferramentas" in q_lower or "origin helper" in q_lower or "origin emulator" in q_lower or "dlc unlocker" in q_lower or "goldberg" in q_lower)):
             cfg = _load_activation_config()
+            instrucoes = cfg.get("ferramentas_instrucoes", {})
             ferramentas = cfg.get("ferramentas", {})
-            if not ferramentas:
+            filter_tool = None
+            if "origin helper" in q_lower or "originhelper" in q_lower:
+                filter_tool = "origin_helper"
+            elif "origin emulator" in q_lower or "originemulator" in q_lower or "emulator" in q_lower:
+                filter_tool = "origin_emulator"
+            elif "dlc unlocker" in q_lower or "dlcunlocker" in q_lower:
+                filter_tool = "dlc_unlockers"
+            elif "goldberg" in q_lower:
+                filter_tool = "goldberg"
+            if instrucoes:
+                items = [(k, v) for k, v in instrucoes.items() if not filter_tool or k == filter_tool]
+                for key, info in items:
+                    titulo = info.get("titulo", key)
+                    desc = info.get("descricao", "")
+                    passos = info.get("passos", [])
+                    downloads = info.get("downloads", {})
+                    url = info.get("url", ferramentas.get(f"anadius_{key.replace('_', '_')}"))
+                    embed = discord.Embed(
+                        title=f"🔧 {titulo}",
+                        description=f"{desc}\n\n**Página:** {url}",
+                        color=0x1e3a5f,
+                    )
+                    if passos:
+                        embed.add_field(name="📋 Passo a passo", value="\n".join(passos)[:1024], inline=False)
+                    if downloads:
+                        links_text = "\n".join(f"• **{k}:** {v}" for k, v in downloads.items())[:1024]
+                        embed.add_field(name="🔗 Downloads", value=links_text, inline=False)
+                    embed.set_footer(text="JP Steam Launcher")
+                    await message.channel.send(embed=embed)
+            elif ferramentas:
+                lines = []
+                labels = {
+                    "anadius_origin_emu": "Origin Emulator",
+                    "anadius_origin_helper": "Origin Helper",
+                    "anadius_dlc_unlockers": "DLC Unlockers",
+                    "anadius_origin_unwrapper": "Origin Unwrapper",
+                    "goldberg_emu": "Goldberg",
+                }
+                for k, url in ferramentas.items():
+                    lbl = labels.get(k, k.replace("_", " ").title())
+                    lines.append(f"**{lbl}:** {url}")
+                embed = discord.Embed(
+                    title="🔧 Ferramentas de Ativação",
+                    description="\n".join(lines),
+                    color=0x1e3a5f,
+                )
+                await message.channel.send(embed=embed)
+            else:
                 await message.channel.send("Nenhuma ferramenta configurada.")
-                return
-            lines = []
-            labels = {
-                "anadius_origin_emu": "Origin Emulator (Anadius)",
-                "anadius_origin_helper": "Origin Helper (gerar token Denuvo)",
-                "anadius_dlc_unlockers": "DLC Unlockers (Sims/EA)",
-                "goldberg_emu": "Goldberg Steam Emulator",
-            }
-            for k, url in ferramentas.items():
-                lbl = labels.get(k, k.replace("_", " ").title())
-                lines.append(f"**{lbl}:** {url}")
-            embed = discord.Embed(
-                title="🔧 Ferramentas de Ativação",
-                description="Links diretos — use conforme o tipo de jogo.\n\n" + "\n".join(lines),
-                color=0x1e3a5f,
-            )
-            embed.set_footer(text="Origin Helper: Violentmonkey + EA.com com conta do jogo para gerar token")
-            await message.channel.send(embed=embed)
             return
 
         await message.channel.typing()
