@@ -353,8 +353,71 @@ MAX_PAGES = 8         # 8 páginas = 1000 jogos no menu
 PLATFORM_LABELS = {"steam": "Steam", "ea": "EA", "ubisoft": "Ubisoft"}
 
 
+class CombinedTicketView(View):
+    """View única com todos os selects (Steam, EA, Ubisoft) — até 5 selects na mesma mensagem."""
+
+    def __init__(self, games_by_platform):
+        super().__init__(timeout=None)
+        selects_added = 0
+        for platform in ("steam", "ea", "ubisoft"):
+            if selects_added >= 5:
+                break
+            jogos = games_by_platform.get(platform, [])
+            if not jogos:
+                continue
+            chunk_size = 25
+            chunks = [jogos[i:i + chunk_size] for i in range(0, len(jogos), chunk_size)][:5 - selects_added]
+            label_platform = PLATFORM_LABELS.get(platform, platform.title())
+            for idx, chunk in enumerate(chunks):
+                if selects_added >= 5:
+                    break
+                options = []
+                for name, val in chunk:
+                    value = str(val)[:100] if val else ""
+                    if not value or not (name or "?").strip():
+                        continue
+                    label = (name or "?")[:100]
+                    desc = f"ID: {val}" if val and val.isdigit() else ""
+                    options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
+                if not options:
+                    options = [discord.SelectOption(label="Nenhum jogo", value="0")]
+                custom_id = f"jogos_select_{platform}_{idx}"
+                start = idx * 25 + 1
+                end = idx * 25 + len(options)
+                placeholder = f"{label_platform} — {start}-{end}" if len(chunks) > 1 else f"{label_platform} — escolher..."
+                select = Select(custom_id=custom_id, placeholder=placeholder[:150], options=options)
+                select.callback = self._on_select
+                self.add_item(select)
+                selects_added += 1
+
+    async def _on_select(self, interaction: discord.Interaction, select: Select = None):
+        try:
+            value = (select.values[0] if select and select.values else None) or (interaction.data or {}).get("values", [None])[0]
+            if not value or value == "0":
+                await interaction.response.send_message("Nenhum jogo selecionado. Digite o ID/nome.", ephemeral=True)
+                return
+            await interaction.response.defer()
+            game, default = _find_game_by_id_or_name(value)
+            if not game:
+                await interaction.followup.send(f"Jogo não encontrado: `{value}`. Tente novamente.", ephemeral=False)
+                return
+            api_base = get_api_url().rstrip("/")
+            embed = _build_activation_response(game, default, api_base)
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f"Erro: {e}", ephemeral=True)
+                else:
+                    await interaction.followup.send("Erro ao processar. Tente digitar o ID.", ephemeral=False)
+            except Exception:
+                pass
+
+
 class PlatformJogosSelectView(View):
-    """Menu Select por plataforma (Steam, EA, Ubisoft)."""
+    """Menu Select por plataforma (Steam, EA, Ubisoft). Usado em mensagens separadas."""
 
     def __init__(self, platform, jogos=None):
         super().__init__(timeout=None)
@@ -620,18 +683,12 @@ class AbrirTicketView(View):
         embed_inicial.set_footer(text="JP Steam Launcher • Use o menu ou digite o ID/nome do jogo")
         embed_inicial.timestamp = datetime.now(timezone.utc)
 
-        await thread.send(content=f"{user.mention}", embed=embed_inicial)
-
-        # Envia menus separados por plataforma (Steam, EA, Ubisoft)
-        for platform in ("steam", "ea", "ubisoft"):
-            jogos = games_by_platform.get(platform, [])
-            if not jogos:
-                continue
-            view = PlatformJogosSelectView(platform=platform, jogos=jogos)
-            if view.children:
-                label = PLATFORM_LABELS.get(platform, platform.title())
-                emoji = {"steam": "🎮", "ea": "⚽", "ubisoft": "🦅"}.get(platform, "🎮")
-                await thread.send(content=f"{emoji} **{label}** — {len(jogos)} jogos", view=view)
+        # Embed + menus na MESMA mensagem (garante que apareçam)
+        view = CombinedTicketView(games_by_platform)
+        if view.children:
+            await thread.send(content=f"{user.mention}", embed=embed_inicial, view=view)
+        else:
+            await thread.send(content=f"{user.mention}", embed=embed_inicial)
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -652,6 +709,7 @@ class JPSteamBot(commands.Bot):
         await self.tree.sync(guild=guild)
         self.add_view(AbrirTicketView())
         games_by_platform = _get_games_by_platform()
+        self.add_view(CombinedTicketView(games_by_platform))
         for platform in ("steam", "ea", "ubisoft"):
             self.add_view(PlatformJogosSelectView(platform=platform, jogos=games_by_platform.get(platform, [])))
         for page in range(MAX_PAGES):
