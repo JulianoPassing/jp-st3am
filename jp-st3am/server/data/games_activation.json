@@ -1,9 +1,9 @@
 {
   "send_launcher_key": false,
   "ferramentas": {
-    "anadius_origin_emu": "https://anadius.su/origin-emulator",
-    "anadius_origin_helper": "https://anadius.su/origin-helper",
-    "anadius_dlc_unlockers": "https://anadius.su/dlc-unlockers",
+    "anadius_origin_emu": "https://mirror.anadius.cc/origin-emulator",
+    "anadius_origin_helper": "https://mirror.anadius.cc/origin-helper",
+    "anadius_dlc_unlockers": "https://mirror.anadius.cc/dlc-unlockers",
     "goldberg_emu": "https://gitlab.com/Mr_Goldberg/goldberg_emulator"
   },
   "games": [
@@ -25,7 +25,7 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe os arquivos do jogo (link abaixo)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Renomeie: GAME.exe → GAME-original.exe | GAME fixed.exe → GAME.exe",
         "4. Execute GAME.exe - será gerado um arquivo de ticket .txt",
         "5. Envie o arquivo .txt aqui neste chat e aguarde o token",
@@ -33,8 +33,8 @@
       ],
       "links": {
         "jogo": "https://multiup.io/7f19828db19c75b93bdfe631e0f70c46",
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -44,14 +44,14 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe os arquivos do jogo (Steam) + arquivos de conversão EA",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Renomeie o executável conforme instruções do jogo",
         "4. Execute e gere o ticket .txt",
         "5. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -248,13 +248,13 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe o jogo (verifique canal)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta",
         "3. Execute o jogo - gere o ticket .txt",
         "4. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -264,13 +264,13 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe o jogo (verifique canal)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Execute e gere o ticket .txt",
         "4. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -280,13 +280,13 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe o jogo (verifique canal)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Execute e gere o ticket .txt",
         "4. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -296,13 +296,13 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe o jogo (verifique canal)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Execute e gere o ticket .txt",
         "4. Envie o ticket aqui e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -310,12 +310,12 @@
     {"appid": "2701440", "name": "EA Sports FC 25", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App (desative atualizações)", "2. VPN (EAU/México/Colômbia) se Showcase", "3. Execute até o menu, feche", "4. Baixe Showcase Magic/Bypass e extraia", "5. Execute Bypass.bat", "6. Inicie pelo executável fixed"], "links": {"launcher": "/download/launcher-completo"}},
     {"appid": "", "name": "EA Sports FC 26", "type": "ea_bypass", "steps": ["1. Baixe FC 26 Showcase pelo EA App (desative atualizações)", "2. VPN: UrbanVPN - UAE, México ou Colômbia", "3. Execute online até o menu, feche", "4. Baixe Showcase Magic (pixeldrain.com/u/Yjy4pTvX) e extraia", "5. Execute Bypass.bat", "6. Inicie por FC26_Showcase fixed.exe"], "links": {"launcher": "/download/launcher-completo"}},
     {"appid": "", "name": "EA Sports Madden 26", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App (desative atualizações)", "2. VPN se Showcase", "3. Execute até o menu, feche", "4. Baixe bypass e extraia", "5. Execute Bypass.bat", "6. Inicie pelo executável fixed"], "links": {"launcher": "/download/launcher-completo"}},
-    {"appid": "1678720", "name": "EA Sports PGA TOUR", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui ou use bypass"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "1678720", "name": "EA Sports PGA TOUR", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui ou use bypass"], "links": {"anadius_emu": "https://mirror.anadius.cc/origin-emulator", "origin_helper": "https://mirror.anadius.cc/origin-helper", "launcher": "/download/launcher-completo"}},
     {"appid": "1844540", "name": "EA Sports WRC", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe bypass e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"launcher": "/download/launcher-completo"}},
-    {"appid": "2488620", "name": "F1 24", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "2488620", "name": "F1 24", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://mirror.anadius.cc/origin-emulator", "origin_helper": "https://mirror.anadius.cc/origin-helper", "launcher": "/download/launcher-completo"}},
     {"appid": "", "name": "F1 25", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe bypass e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"launcher": "/download/launcher-completo"}},
-    {"appid": "1307710", "name": "Grid Legends", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
-    {"appid": "1249790", "name": "Lost in Random", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://anadius.su/origin-emulator", "origin_helper": "https://anadius.su/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "1307710", "name": "Grid Legends", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://mirror.anadius.cc/origin-emulator", "origin_helper": "https://mirror.anadius.cc/origin-helper", "launcher": "/download/launcher-completo"}},
+    {"appid": "1249790", "name": "Lost in Random", "type": "ea_bypass", "steps": ["1. Baixe pelo EA App", "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia", "3. Execute e gere ticket se Denuvo", "4. Envie ticket aqui"], "links": {"anadius_emu": "https://mirror.anadius.cc/origin-emulator", "origin_helper": "https://mirror.anadius.cc/origin-helper", "launcher": "/download/launcher-completo"}},
     {"appid": "2249480", "name": "Prince of Persia The Lost Crown", "type": "bypass", "steps": ["1. Baixe o jogo e o bypass", "2. Extraia na pasta do jogo", "3. Execute o jogo"], "links": {"launcher": "/download/launcher-completo"}}
   ],
   "activation_templates": {
@@ -323,14 +323,14 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe os arquivos do jogo (verifique o canal de instruções)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta do jogo",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta do jogo",
         "3. Renomeie os executáveis conforme instruções do jogo",
         "4. Execute o jogo - será gerado um arquivo de ticket .txt",
         "5. Envie o arquivo .txt aqui neste chat e aguarde o token"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },
@@ -359,14 +359,14 @@
       "type": "denuvo_ticket",
       "steps": [
         "1. Baixe o jogo (EA App/Origin)",
-        "2. Baixe o Origin Emulator em anadius.su/origin-emulator (link abaixo) e extraia na pasta",
+        "2. Baixe o Origin Emulator em mirror.anadius.cc/origin-emulator (link abaixo) e extraia na pasta",
         "3. Execute o jogo - gere o ticket .txt",
         "4. Envie o ticket aqui e aguarde o token",
         "5. Coloque o token em anadius.cfg"
       ],
       "links": {
-        "anadius_emu": "https://anadius.su/origin-emulator",
-        "origin_helper": "https://anadius.su/origin-helper",
+        "anadius_emu": "https://mirror.anadius.cc/origin-emulator",
+        "origin_helper": "https://mirror.anadius.cc/origin-helper",
         "launcher": "/download/launcher-completo"
       }
     },

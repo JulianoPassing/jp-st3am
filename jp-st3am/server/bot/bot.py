@@ -166,6 +166,35 @@ def _get_all_games_from_sources():
     return sorted(result, key=lambda x: (x[0] or "?").upper())
 
 
+def _get_games_by_platform():
+    """Retorna jogos agrupados por plataforma: {platform: [(name, appid), ...]}."""
+    catalog = _load_catalog()
+    seen = set()
+    result = {"steam": [], "ea": [], "ubisoft": []}
+
+    for platform in ("steam", "ea", "ubisoft"):
+        for g in catalog.get(platform, []):
+            name = g.get("name") or "?"
+            appid = str(g.get("appid", "")).strip()
+            key = appid if appid else name
+            if key and key not in seen:
+                seen.add(key)
+                result[platform].append((name, appid if appid else name))
+
+    for platform in result:
+        result[platform] = sorted(result[platform], key=lambda x: (x[0] or "?").upper())
+
+    if not any(result.values()):
+        cfg = _load_activation_config()
+        for g in cfg.get("games", []):
+            appid = str(g.get("appid", ""))
+            if appid:
+                result["steam"].append((g.get("name", "?"), appid))
+        result["steam"] = sorted(result["steam"], key=lambda x: (x[0] or "?").upper())
+
+    return result
+
+
 def _get_template_for_platform(platform):
     """Retorna template de ativação por plataforma (steam/ea/ubisoft)."""
     cfg = _load_activation_config()
@@ -325,10 +354,91 @@ def _build_activation_response(game, default, api_base):
 
 GAMES_PER_PAGE = 125  # 5 selects x 25 opções
 MAX_PAGES = 8         # 8 páginas = 1000 jogos no menu
+PLATFORM_LABELS = {"steam": "Steam", "ea": "EA", "ubisoft": "Ubisoft"}
+
+
+class PlatformJogosSelectView(View):
+    """Menu Select por plataforma (Steam, EA, Ubisoft)."""
+
+    def __init__(self, platform, jogos=None):
+        super().__init__(timeout=None)
+        self.platform = platform
+        games_list = jogos if jogos is not None else []
+        chunk_size = 25
+        chunks = [games_list[i:i + chunk_size] for i in range(0, len(games_list), chunk_size)][:5]
+        if not chunks:
+            chunks = [[]]
+
+        label_platform = PLATFORM_LABELS.get(platform, platform.title())
+        for idx, chunk in enumerate(chunks):
+            options = []
+            for name, val in chunk:
+                value = str(val)[:100] if val else ""
+                if not value or not (name or "?").strip():
+                    continue
+                label = (name or "?")[:100]
+                desc = f"ID: {val}" if val and val.isdigit() else ""
+                options.append(discord.SelectOption(label=label, value=value, description=desc[:100] if desc else None))
+            if not options:
+                options = [discord.SelectOption(label="Nenhum jogo", value="0")]
+            custom_id = f"jogos_select_{platform}_{idx}"
+            start = idx * 25 + 1
+            end = idx * 25 + len(options)
+            placeholder = f"{label_platform} — {start}-{end}" if len(chunks) > 1 else f"{label_platform} — escolher..."
+            select = Select(
+                custom_id=custom_id,
+                placeholder=placeholder[:150],
+                options=options,
+            )
+            select.callback = self._on_select
+            self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction, select: Select = None):
+        try:
+            value = None
+            if select and select.values:
+                value = select.values[0]
+            elif interaction.data and interaction.data.get("values"):
+                value = interaction.data["values"][0]
+            if not value or value == "0":
+                await interaction.response.send_message(
+                    "Nenhum jogo selecionado. Use o menu ou digite o ID/nome.",
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.response.defer()
+            game, default = _find_game_by_id_or_name(value)
+            if not game:
+                await interaction.followup.send(
+                    f"Jogo não encontrado: `{value}`. Tente novamente ou digite o ID/nome.",
+                    ephemeral=False,
+                )
+                return
+
+            api_base = get_api_url().rstrip("/")
+            embed = _build_activation_response(game, default, api_base)
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        f"Erro ao processar seleção. ({e})",
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.followup.send(
+                        f"Erro ao processar. Tente digitar o ID do jogo.",
+                        ephemeral=False,
+                    )
+            except Exception:
+                pass
 
 
 class JogosSelectView(View):
-    """Menu Select clicável - uma página (até 125 jogos em 5 selects)."""
+    """Menu Select clicável - uma página (até 125 jogos em 5 selects). Legado para tickets antigos."""
 
     def __init__(self, jogos=None, page=0):
         super().__init__(timeout=None)
@@ -336,15 +446,13 @@ class JogosSelectView(View):
         if not games_list:
             games_list = _get_activation_games_list()
 
-        # Pega a fatia desta página
         start_idx = page * GAMES_PER_PAGE
         page_games = games_list[start_idx:start_idx + GAMES_PER_PAGE]
 
-        # Discord: máx 5 selects, 25 opções cada
         chunk_size = 25
         chunks = [page_games[i:i + chunk_size] for i in range(0, len(page_games), chunk_size)][:5]
         if not chunks and page < MAX_PAGES:
-            chunks = [[]]  # Placeholder para manter custom_id em páginas vazias (persistência)
+            chunks = [[]]
 
         for idx, chunk in enumerate(chunks):
             options = []
@@ -496,7 +604,7 @@ class AbrirTicketView(View):
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
-        games_list = _get_all_games_from_sources()
+        games_by_platform = _get_games_by_platform()
 
         embed_inicial = discord.Embed(
             title="Ticket de Ativação — JP Steam Launcher",
@@ -515,13 +623,15 @@ class AbrirTicketView(View):
 
         await thread.send(content=f"{user.mention}", embed=embed_inicial)
 
-        # Envia menus em páginas (125 jogos por mensagem, até 8 páginas = 1000 jogos)
-        num_pages = min(MAX_PAGES, (len(games_list) + GAMES_PER_PAGE - 1) // GAMES_PER_PAGE) if games_list else 0
-        for page in range(num_pages):
-            view = JogosSelectView(jogos=games_list, page=page)
+        # Envia menus separados por plataforma (Steam, EA, Ubisoft)
+        for platform in ("steam", "ea", "ubisoft"):
+            jogos = games_by_platform.get(platform, [])
+            if not jogos:
+                continue
+            view = PlatformJogosSelectView(platform=platform, jogos=jogos)
             if view.children:
-                label = f"Jogos {page * GAMES_PER_PAGE + 1}-{min((page + 1) * GAMES_PER_PAGE, len(games_list))}" if num_pages > 1 else "Jogos disponíveis"
-                await thread.send(content=f"📋 **{label}**", view=view)
+                label = PLATFORM_LABELS.get(platform, platform.title())
+                await thread.send(content=f"🎮 **{label}** ({len(jogos)} jogos)", view=view)
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -541,8 +651,11 @@ class JPSteamBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         self.add_view(AbrirTicketView())
+        games_by_platform = _get_games_by_platform()
+        for platform in ("steam", "ea", "ubisoft"):
+            self.add_view(PlatformJogosSelectView(platform=platform, jogos=games_by_platform.get(platform, [])))
         for page in range(MAX_PAGES):
-            self.add_view(JogosSelectView(page=page))  # Persistência dos menus em tickets antigos
+            self.add_view(JogosSelectView(page=page))  # Legado: tickets antigos
         print(f"Comandos sincronizados no servidor {DISCORD_GUILD_ID}")
 
     async def on_ready(self):
@@ -645,35 +758,44 @@ async def on_message(message):
 
 
 def _build_ativar_embed():
-    """Monta embed profissional para /ativar com banner e lista de jogos."""
-    games_list = _get_all_games_from_sources()
-    if not games_list:
+    """Monta embed profissional para /ativar com banner e lista de jogos por plataforma."""
+    games_by_platform = _get_games_by_platform()
+    total = sum(len(g) for g in games_by_platform.values())
+
+    if not total:
         games_list = _get_activation_games_list()
-    if games_list:
-        preview = [f"• **{name}** `ID: {appid}`" for name, appid in games_list[:8]]
-        games_text = "\n".join(preview)
-        if len(games_list) > 8:
-            games_text += f"\n\n_... e mais {len(games_list) - 8} jogos no menu do ticket_"
-    else:
-        games_text = "_Nenhum jogo configurado nas fontes._"
+        total = len(games_list)
+        games_by_platform = {"steam": games_list} if games_list else {}
+
+    fields = []
+    for platform in ("steam", "ea", "ubisoft"):
+        jogos = games_by_platform.get(platform, [])
+        if not jogos:
+            continue
+        label = PLATFORM_LABELS.get(platform, platform.title())
+        preview = [f"• **{name}** `{appid}`" for name, appid in jogos[:5]]
+        text = "\n".join(preview)
+        if len(jogos) > 5:
+            text += f"\n_... +{len(jogos) - 5} jogos_"
+        fields.append((f"🎮 {label} ({len(jogos)})", text))
 
     embed = discord.Embed(
         title="JP Steam Launcher — Ativação de Jogos",
         description=(
             "Clique no botão abaixo para abrir um **ticket privado** de ativação.\n\n"
-            "No ticket, **escolha no menu** ou envie o **ID/nome do jogo** e receba automaticamente:\n"
+            "No ticket, **escolha no menu por plataforma** (Steam, EA, Ubisoft) ou envie o **ID/nome do jogo**.\n"
             "• Passo a passo de instalação\n"
-            "• Links para download (Secret Sauce, arquivos do jogo)\n"
+            "• Links (Anadius, Origin Emulator, etc.)\n"
             "• Instruções específicas para cada jogo\n\n"
-            f"**{len(games_list)} jogos disponíveis** (Steam, EA, Ubisoft):"
+            f"**{total} jogos disponíveis**"
         ),
         color=0x6366f1,
     )
-    embed.add_field(
-        name="📋 Alguns jogos",
-        value=games_text[:1024] + ("..." if len(games_text) > 1024 else ""),
-        inline=False,
-    )
+    if fields:
+        for name, value in fields:
+            embed.add_field(name=name, value=value[:1024] + ("..." if len(value) > 1024 else ""), inline=True)
+    else:
+        embed.add_field(name="📋 Jogos", value="_Nenhum jogo configurado._", inline=False)
     embed.set_image(url=BANNER_URL)
     embed.set_footer(text="Use o ID numérico ou nome do jogo no ticket")
     return embed
