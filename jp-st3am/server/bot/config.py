@@ -28,7 +28,8 @@ def _load():
     return cfg
 
 def get_bot_token():
-    return os.environ.get("DISCORD_BOT_TOKEN") or _load().get("discord_bot_token", "")
+    t = os.environ.get("DISCORD_BOT_TOKEN") or _load().get("discord_bot_token", "")
+    return (t or "").strip()
 
 def get_api_url():
     return os.environ.get("JP_LICENSE_URL") or _load().get("license_server", "http://localhost:5050")
