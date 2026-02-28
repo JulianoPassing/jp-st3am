@@ -12,6 +12,7 @@ import sqlite3
 import zipfile
 import io
 import hashlib
+import urllib.request
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_file
@@ -254,6 +255,144 @@ def launcher_version():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+# === PAINEL E API DE JOGOS ===
+GAMELIST_URL = "https://raw.githubusercontent.com/SteamTools-Team/GameList/main/games.json"
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+GAMES_CACHE_PATH = os.path.join(DATA_DIR, "games_cache.json")
+ACTIVATION_CONFIG_PATH = os.path.join(DATA_DIR, "games_activation.json")
+
+
+def _ensure_data_dir():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _load_activation_config():
+    _ensure_data_dir()
+    if os.path.exists(ACTIVATION_CONFIG_PATH):
+        try:
+            with open(ACTIVATION_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"games": [], "sources": {}}
+
+
+def _fetch_gamelist():
+    _ensure_data_dir()
+    if os.path.exists(GAMES_CACHE_PATH):
+        try:
+            mtime = os.path.getmtime(GAMES_CACHE_PATH)
+            if (datetime.now().timestamp() - mtime) < 3600:
+                with open(GAMES_CACHE_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+    try:
+        req = urllib.request.Request(GAMELIST_URL, headers={"User-Agent": "JP-Steam/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read().decode())
+        with open(GAMES_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return data
+    except Exception:
+        if os.path.exists(GAMES_CACHE_PATH):
+            with open(GAMES_CACHE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+
+
+@app.route("/api/games/search")
+def api_games_search():
+    """Busca jogos. Query: ?q=nome&limit=50"""
+    q = (request.args.get("q") or "").lower().strip()
+    limit = min(int(request.args.get("limit", 50)), 100)
+    games = _fetch_gamelist()
+    if not isinstance(games, list):
+        games = games.get("games", []) if isinstance(games, dict) else []
+    if q:
+        games = [g for g in games if q in (g.get("name") or "").lower() or q in str(g.get("appid", ""))][:limit]
+    else:
+        games = games[:limit]
+    return jsonify({"games": games, "total": len(games)})
+
+
+@app.route("/api/games/activation")
+def api_games_activation():
+    """Lista jogos que precisam de ativação especial."""
+    return jsonify(_load_activation_config())
+
+
+@app.route("/api/admin/sync-gamelist", methods=["POST"])
+@require_admin
+def api_sync_gamelist():
+    """Força sync da lista de jogos do SteamTools."""
+    try:
+        data = _fetch_gamelist()
+        total = len(data) if isinstance(data, list) else 0
+        return jsonify({"ok": True, "count": total})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/panel")
+def panel():
+    """Painel web com jogos e opções."""
+    activation = _load_activation_config()
+    return f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JP Steam Launcher - Painel</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: system-ui, sans-serif; background: #1a1a1a; color: #fff; min-height: 100vh; padding: 24px; }}
+        .container {{ max-width: 900px; margin: 0 auto; }}
+        h1 {{ color: #2563eb; margin-bottom: 24px; font-size: 1.5rem; }}
+        .card {{ background: #252525; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 1px solid #333; }}
+        .card h2 {{ font-size: 1rem; margin-bottom: 12px; color: #b0b0b0; }}
+        a {{ color: #2563eb; text-decoration: none; }}
+        a:hover {{ text-decoration: underline; }}
+        .btn {{ display: inline-block; background: #2563eb; color: #fff; padding: 10px 20px; border-radius: 6px; margin-top: 8px; }}
+        .btn:hover {{ background: #1d4ed8; }}
+        ul {{ list-style: none; }}
+        li {{ padding: 6px 0; border-bottom: 1px solid #333; }}
+        li:last-child {{ border: none; }}
+        .meta {{ font-size: 0.85rem; color: #888; margin-top: 4px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JP Steam Launcher - Painel</h1>
+        
+        <div class="card">
+            <h2>Download</h2>
+            <a href="/download/launcher-completo" class="btn">Baixar Launcher (ZIP)</a>
+        </div>
+        
+        <div class="card">
+            <h2>Jogos com ativação especial</h2>
+            <ul>
+                {"".join(f'<li><strong>{g.get("name", "?")}</strong> (ID: {g.get("appid", "")}) - {g.get("type", "?")}<span class="meta">{g.get("instructions", "")}</span></li>' for g in activation.get("games", [])) or "<li>Nenhum jogo configurado. Edite data/games_activation.json</li>"}
+            </ul>
+            <p class="meta" style="margin-top:12px">Config: data/games_activation.json</p>
+        </div>
+        
+        <div class="card">
+            <h2>API</h2>
+            <ul>
+                <li><a href="/api/games/search">/api/games/search?q=nome</a> - Buscar jogos</li>
+                <li><a href="/api/games/activation">/api/games/activation</a> - Jogos com ativação</li>
+                <li><a href="/health">/health</a> - Status</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
 
 if __name__ == "__main__":

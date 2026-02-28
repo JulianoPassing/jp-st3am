@@ -77,6 +77,20 @@ pm2 save
 pm2 startup
 ```
 
+### 1.5b Rodar o Bot Discord (opcional)
+
+Adicione `discord_bot_token` no `config.json` (crie o bot em discord.com/developers).
+
+```bash
+# Em outro terminal ou background
+nohup venv/bin/python run_bot.py > bot.log 2>&1 &
+```
+
+Ou com PM2:
+```bash
+pm2 start run_bot.py --name jp-bot --interpreter ./venv/bin/python
+```
+
 ### 1.6 Liberar a porta no firewall (se houver)
 ```bash
 # UFW (Ubuntu)
@@ -94,14 +108,18 @@ sudo firewall-cmd --reload
 
 ```
 server/
-├── app.py           # API principal
-├── config.json      # Porta e senha admin (EDITAR)
+├── app.py           # API principal + painel /panel
+├── bot/             # Bot Discord (servidor 1477391471752773754)
+│   ├── bot.py       # /pegar-key, /gerar-key, /buscar-jogo, /jogos-ativacao
+│   └── config.py
+├── data/            # games_cache.json, games_activation.json
+├── config.json      # Porta, admin_secret, discord_bot_token (EDITAR)
+├── run_bot.py       # python run_bot.py
 ├── requirements.txt
-├── downloads/       # JP-Steam-Launcher.exe + PermitirFirewall.bat
+├── downloads/       # JP-Steam-Launcher.exe + .bat
 ├── generate_keys.py # Gera keys via API
 ├── seed_keys.py     # Gerar keys direto no banco
-├── keys.db          # Banco criado automaticamente
-└── DEPLOY_VPS.md    # Este arquivo
+└── BOT_README.md    # Instruções do bot
 ```
 
 ---

