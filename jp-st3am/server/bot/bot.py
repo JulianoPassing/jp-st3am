@@ -23,6 +23,7 @@ from discord.ui import Button, Select, View
 from .config import (
     DISCORD_GUILD_ID,
     get_ticket_category_id,
+    get_support_role_id,
     get_bot_token,
     get_api_url,
     get_admin_secret,
@@ -353,6 +354,42 @@ MAX_PAGES = 8         # 8 páginas = 1000 jogos no menu
 PLATFORM_LABELS = {"steam": "Steam", "ea": "EA", "ubisoft": "Ubisoft"}
 
 
+class FeedbackAtivacaoView(View):
+    """Botões Deu certo / Não deu após instruções de ativação."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Deu certo", style=discord.ButtonStyle.success, custom_id="feedback_ok")
+    async def deu_certo(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.defer(ephemeral=True)
+        ch = interaction.channel
+        if isinstance(ch, discord.Thread):
+            try:
+                await ch.edit(archived=True)
+                await interaction.followup.send("Ticket encerrado com sucesso.", ephemeral=True)
+            except discord.Forbidden:
+                await interaction.followup.send("Sem permissão para arquivar.", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"Erro: {e}", ephemeral=True)
+        else:
+            await interaction.followup.send("Use no ticket de ativação.", ephemeral=True)
+
+    @discord.ui.button(label="Não deu", style=discord.ButtonStyle.danger, custom_id="feedback_fail")
+    async def nao_deu(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.defer(ephemeral=True)
+        ch = interaction.channel
+        if isinstance(ch, discord.Thread):
+            role_id = get_support_role_id()
+            try:
+                await ch.send(content=f"<@&{role_id}> O usuário relatou que **não deu certo** com a ativação.")
+                await interaction.followup.send("Suporte foi notificado.", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"Erro: {e}", ephemeral=True)
+        else:
+            await interaction.followup.send("Use no ticket de ativação.", ephemeral=True)
+
+
 class CombinedTicketView(View):
     """View única com todos os selects (Steam, EA, Ubisoft) — até 5 selects na mesma mensagem."""
 
@@ -403,7 +440,7 @@ class CombinedTicketView(View):
                 return
             api_base = get_api_url().rstrip("/")
             embed = _build_activation_response(game, default, api_base)
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=FeedbackAtivacaoView())
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -564,7 +601,7 @@ class JogosSelectView(View):
 
             api_base = get_api_url().rstrip("/")
             embed = _build_activation_response(game, default, api_base)
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=FeedbackAtivacaoView())
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -615,56 +652,25 @@ class AbrirTicketView(View):
             return
 
         ticket_channel = None
+        is_forum = False
+        ForumChannel = getattr(discord, "ForumChannel", None)
         for ch in category.channels:
+            if ForumChannel and isinstance(ch, ForumChannel):
+                ticket_channel = ch
+                is_forum = True
+                break
             if isinstance(ch, discord.TextChannel):
                 ticket_channel = ch
                 break
 
         if not ticket_channel:
             await interaction.followup.send(
-                "Nenhum canal de texto na categoria de tickets. Crie um canal na categoria.",
+                "Nenhum canal de texto ou fórum na categoria de tickets. Crie um canal na categoria.",
                 ephemeral=True,
             )
             return
-
-        thread_name = f"ativacao-{user.display_name[:20]}-{datetime.now().strftime('%H%M')}"
-        try:
-            thread = await ticket_channel.create_thread(
-                name=thread_name,
-                type=discord.ChannelType.private_thread,
-                reason="Ticket de ativação",
-            )
-        except discord.Forbidden as e:
-            await interaction.followup.send(
-                f"Sem permissão para criar thread privada. Verifique se o canal permite threads privadas. ({e})",
-                ephemeral=True,
-            )
-            return
-        except Exception as e:
-            await interaction.followup.send(
-                f"Erro ao criar ticket: {e}",
-                ephemeral=True,
-            )
-            return
-
-        activation_threads.add(thread.id)
-
-        try:
-            await thread.add_user(user)
-        except discord.Forbidden:
-            pass
-
-        for member in guild.members:
-            if member.bot:
-                continue
-            if member.guild_permissions.administrator:
-                try:
-                    await thread.add_user(member)
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
 
         games_by_platform = _get_games_by_platform()
-
         total_jogos = sum(len(g) for g in games_by_platform.values())
         embed_inicial = discord.Embed(
             title="🎮 Ticket de Ativação",
@@ -683,12 +689,56 @@ class AbrirTicketView(View):
         embed_inicial.set_footer(text="JP Steam Launcher • Use o menu ou digite o ID/nome do jogo")
         embed_inicial.timestamp = datetime.now(timezone.utc)
 
-        # Embed + menus na MESMA mensagem (garante que apareçam)
         view = CombinedTicketView(games_by_platform)
-        if view.children:
-            await thread.send(content=f"{user.mention}", embed=embed_inicial, view=view)
-        else:
-            await thread.send(content=f"{user.mention}", embed=embed_inicial)
+        content = f"{user.mention}"
+
+        thread_name = f"ativacao-{user.display_name[:20]}-{datetime.now().strftime('%H%M')}"
+        try:
+            if is_forum:
+                thread = await ticket_channel.create_thread(
+                    name=thread_name,
+                    content=content,
+                    embed=embed_inicial,
+                    view=view if view.children else None,
+                )
+            else:
+                thread = await ticket_channel.create_thread(
+                    name=thread_name,
+                    type=discord.ChannelType.private_thread,
+                    reason="Ticket de ativação",
+                )
+                if view.children:
+                    await thread.send(content=content, embed=embed_inicial, view=view)
+                else:
+                    await thread.send(content=content, embed=embed_inicial)
+        except discord.Forbidden as e:
+            await interaction.followup.send(
+                f"Sem permissão para criar ticket. ({e})",
+                ephemeral=True,
+            )
+            return
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await interaction.followup.send(
+                f"Erro ao criar ticket: {e}",
+                ephemeral=True,
+            )
+            return
+
+        activation_threads.add(thread.id)
+        try:
+            await thread.add_user(user)
+        except discord.Forbidden:
+            pass
+        for member in guild.members:
+            if member.bot:
+                continue
+            if member.guild_permissions.administrator:
+                try:
+                    await thread.add_user(member)
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
         await interaction.followup.send(
             f"Ticket privado criado: {thread.mention}\nEnvie o ID ou nome do jogo lá.",
             ephemeral=True,
@@ -708,6 +758,7 @@ class JPSteamBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         self.add_view(AbrirTicketView())
+        self.add_view(FeedbackAtivacaoView())
         games_by_platform = _get_games_by_platform()
         self.add_view(CombinedTicketView(games_by_platform))
         for platform in ("steam", "ea", "ubisoft"):
@@ -810,7 +861,7 @@ async def on_message(message):
 
         api_base = get_api_url().rstrip("/")
         embed = _build_activation_response(game, default, api_base)
-        await message.channel.send(embed=embed)
+        await message.channel.send(embed=embed, view=FeedbackAtivacaoView())
 
     await bot.process_commands(message)
 

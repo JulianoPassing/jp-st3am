@@ -16,6 +16,11 @@ DISCORD_BOT_ID = 1477391841488801953
 def get_ticket_category_id():
     return int(_load().get("ticket_category_id", 1477393102246379600))
 
+
+def get_support_role_id():
+    """ID do cargo para marcar quando 'Não deu'."""
+    return int(_load().get("support_role_id", 1477397336572559461))
+
 # Carregar config
 def _load():
     cfg = {}

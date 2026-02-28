@@ -3,5 +3,6 @@
   "admin_secret": "ALTERE_SUA_SENHA_SEGURA",
   "license_server": "http://191.252.100.71:5050",
   "discord_bot_token": "SEU_TOKEN_DO_BOT_DISCORD",
-  "ticket_category_id": 1477393102246379600
+  "ticket_category_id": 1477393102246379500,
+  "support_role_id": 1477397336572559461
 }
